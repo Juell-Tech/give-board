@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Give Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink: #21322A;
+    --forest: #2C4A3E;
+    --forest-dark: #1B3129;
+    --paper: #FBF8F1;
+    --paper-warm: #F3ECD9;
+    --gold: #D99A2B;
+    --gold-dark: #B87F1E;
+    --clay: #C1522E;
+    --line: #D8CFB8;
+    --muted: #6B6558;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Work Sans',sans-serif;}
+  h1,h2,h3,.display{font-family:'Fraunces',serif;}
+
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:22px 6vw;border-bottom:1px solid var(--line);
+    background:var(--paper);position:sticky;top:0;z-index:20;flex-wrap:wrap;gap:12px;
+  }
+  .wordmark{display:flex;align-items:baseline;gap:10px;}
+  .wordmark .mark{font-family:'Fraunces',serif;font-weight:700;font-size:1.5rem;color:var(--forest);}
+  .wordmark .tag{font-size:0.8rem;color:var(--muted);}
+  .header-actions{display:flex;gap:10px;flex-wrap:wrap;}
+  .btn{
+    font-family:'Work Sans',sans-serif;font-weight:600;font-size:0.92rem;
+    border:none;border-radius:3px;padding:11px 20px;cursor:pointer;
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .btn:active{transform:translateY(1px);}
+  .btn-primary{background:var(--forest);color:var(--paper);}
+  .btn-primary:hover{background:var(--forest-dark);}
+  .btn-gold{background:var(--gold);color:#2B1E05;}
+  .btn-gold:hover{background:var(--gold-dark);}
+  .btn-ghost{background:transparent;color:var(--forest);border:1.5px solid var(--forest);}
+  .btn-ghost:hover{background:var(--forest);color:var(--paper);}
+
+  .hero{
+    padding:56px 6vw 40px;border-bottom:1px solid var(--line);
+    display:flex;justify-content:space-between;align-items:flex-end;gap:32px;flex-wrap:wrap;
+  }
+  .hero h1{font-size:clamp(2.1rem,4vw,3.1rem);line-height:1.08;margin:0 0 14px;font-weight:600;max-width:620px;}
+  .hero p{color:var(--muted);max-width:420px;margin:0;line-height:1.55;}
+  .privacy-note{
+    display:flex;gap:10px;align-items:flex-start;background:var(--paper-warm);
+    border:1px solid var(--line);border-radius:4px;padding:12px 16px;margin-top:18px;max-width:520px;
+  }
+  .privacy-note .dot{width:8px;height:8px;border-radius:50%;background:var(--forest);margin-top:7px;flex-shrink:0;}
+  .privacy-note p{margin:0;font-size:0.85rem;color:var(--forest-dark);line-height:1.5;max-width:none;}
+
+  .board{padding:44px 6vw 90px;}
+  .board-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px;}
+  .board-head h2{margin:0;font-size:1.3rem;font-weight:600;color:var(--forest);}
+  .count{color:var(--muted);font-size:0.9rem;}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:26px 22px;}
+  .card{
+    background:var(--paper-warm);border:1px solid var(--line);border-radius:2px;
+    padding:14px 14px 16px;cursor:pointer;position:relative;
+    transform:rotate(var(--r,0deg));transition:transform .18s ease, box-shadow .18s ease;
+    box-shadow:0 1px 0 rgba(33,50,42,0.06);
+  }
+  .card:hover{transform:rotate(0deg) translateY(-3px);box-shadow:0 10px 18px rgba(33,50,42,0.12);}
+  .card .pin{
+    position:absolute;top:-7px;left:50%;transform:translateX(-50%);
+    width:12px;height:12px;border-radius:50%;background:var(--clay);box-shadow:0 1px 2px rgba(0,0,0,.3);
+  }
+  .card img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;border:1px solid var(--line);background:#eee;}
+  .card h3{font-size:1.02rem;margin:10px 0 4px;font-weight:600;line-height:1.25;}
+  .card .meta{font-size:0.8rem;color:var(--muted);}
+  .badge{
+    display:inline-block;font-size:0.72rem;font-weight:600;padding:3px 9px;border-radius:20px;
+    letter-spacing:.2px;margin-top:6px;
+  }
+  .badge-likenew{background:#E4EFE6;color:var(--forest-dark);}
+  .badge-good{background:#FBEBCF;color:var(--gold-dark);}
+  .badge-wellloved{background:#F3DED2;color:#8A3D1F;}
+
+  .empty{border:1.5px dashed var(--line);border-radius:4px;padding:50px 20px;text-align:center;color:var(--muted);}
+  .empty strong{display:block;color:var(--ink);font-family:'Fraunces',serif;font-size:1.2rem;margin-bottom:6px;font-weight:600;}
+
+  .overlay{position:fixed;inset:0;background:rgba(27,32,25,0.55);display:none;align-items:center;justify-content:center;padding:20px;z-index:100;}
+  .overlay.open{display:flex;}
+  .modal{background:var(--paper);max-width:640px;width:100%;max-height:90vh;overflow-y:auto;border-radius:4px;position:relative;box-shadow:0 24px 60px rgba(0,0,0,.3);}
+  .modal-close{position:absolute;top:14px;right:14px;background:var(--forest);color:var(--paper);border:none;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;line-height:1;z-index:5;}
+
+  .detail-img{width:100%;max-height:360px;object-fit:cover;display:block;background:#eee;}
+  .detail-body{padding:26px 28px 30px;}
+  .detail-body h2{margin:0 0 6px;font-size:1.55rem;font-weight:600;}
+  .detail-body .meta-row{color:var(--muted);font-size:0.88rem;margin-bottom:16px;}
+  .detail-body .desc{line-height:1.6;margin-bottom:24px;white-space:pre-wrap;}
+  .take-btn{display:block;width:100%;padding:16px;font-size:1rem;font-weight:600;background:var(--clay);color:var(--paper);border:none;border-radius:3px;cursor:pointer;letter-spacing:.2px;}
+  .take-btn:hover{background:#A6441F;}
+
+  .claim-box{border:1px solid var(--line);border-radius:4px;padding:18px;background:var(--paper-warm);margin-top:6px;}
+  .claim-box p{margin:0 0 12px;font-size:0.85rem;color:var(--muted);line-height:1.5;}
+  .claim-box textarea{width:100%;min-height:80px;border:1px solid var(--line);border-radius:3px;padding:10px 12px;font-family:'Work Sans',sans-serif;font-size:0.92rem;}
+  .claim-box input{width:100%;border:1px solid var(--line);border-radius:3px;padding:10px 12px;font-family:'Work Sans',sans-serif;font-size:0.92rem;margin-top:10px;}
+  .claim-box .optional-label{font-size:0.75rem;color:var(--muted);margin-top:10px;display:block;}
+  .sent-note{color:var(--forest);font-size:0.88rem;margin-top:10px;display:none;}
+
+  .form-body{padding:28px 28px 32px;}
+  .form-body h2{margin:0 0 4px;font-size:1.5rem;font-weight:600;}
+  .form-body .sub{color:var(--muted);font-size:0.9rem;margin-bottom:22px;}
+  label{display:block;font-size:0.85rem;font-weight:600;margin:16px 0 6px;color:var(--forest);}
+  input[type=text], textarea, input[type=email]{
+    width:100%;border:1px solid var(--line);border-radius:3px;padding:11px 12px;
+    font-family:'Work Sans',sans-serif;font-size:0.95rem;background:#fff;color:var(--ink);
+  }
+  textarea{min-height:80px;resize:vertical;}
+  .drop{border:1.5px dashed var(--line);border-radius:4px;padding:22px 16px;text-align:center;color:var(--muted);font-size:0.9rem;background:#fff;}
+  .drop.has-img{padding:0;border-style:solid;}
+  .drop img{width:100%;max-height:220px;object-fit:cover;display:block;border-radius:3px;}
+  .photo-choice{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+  .photo-choice .btn{padding:9px 16px;font-size:0.85rem;}
+  .form-actions{margin-top:24px;}
+  .err{color:var(--clay);font-size:0.85rem;margin-top:6px;display:none;}
+  .field-note{font-size:0.78rem;color:var(--muted);margin-top:5px;}
+
+  .confirm-body{padding:32px 28px;text-align:center;}
+  .confirm-body .mark{font-size:2rem;margin-bottom:8px;}
+  .ref-code{font-family:'Fraunces',serif;font-weight:700;font-size:1.7rem;color:var(--forest);background:var(--paper-warm);border:1px solid var(--line);border-radius:4px;padding:14px;margin:18px 0;letter-spacing:1px;}
+  .confirm-body p{color:var(--muted);line-height:1.55;font-size:0.92rem;}
+  .confirm-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;justify-content:center;}
+
+  .lookup-list{text-align:left;margin-top:18px;}
+  .msg-item{border:1px solid var(--line);border-radius:4px;padding:12px 14px;margin-bottom:10px;background:var(--paper-warm);}
+  .msg-item .msg-text{font-size:0.92rem;line-height:1.5;margin-bottom:6px;white-space:pre-wrap;}
+  .msg-item .msg-meta{font-size:0.75rem;color:var(--muted);}
+
+  @media(max-width:560px){
+    header{padding:16px 5vw;}
+    .hero{padding:36px 5vw 30px;}
+    .board{padding:32px 5vw 70px;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wordmark">
+    <span class="mark">The Give Board</span>
+    <span class="tag">— pass it on</span>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-ghost" onclick="openLookupModal()">Check your listing</button>
+    <button class="btn btn-primary" onclick="openPostModal()">Give an item</button>
+  </div>
+</header>
+
+<section class="hero">
+  <div>
+    <h1>Things people no longer need, waiting for someone who does.</h1>
+    <p>Post something you're giving away. Anyone can browse and claim it — no accounts, no names, no contact details on display.</p>
+    <div class="privacy-note">
+      <div class="dot"></div>
+      <p>Nobody's name or email is ever shown on this site. Posting gives you a private reference code — that's the only thing needed to give an item away or check messages about it.</p>
+    </div>
+  </div>
+</section>
+
+<section class="board">
+  <div class="board-head">
+    <h2>On the board right now</h2>
+    <span class="count" id="itemCount"></span>
+  </div>
+  <div id="gridWrap"></div>
+</section>
+
+<!-- ITEM DETAIL MODAL -->
+<div class="overlay" id="detailOverlay">
+  <div class="modal">
+    <button class="modal-close" onclick="closeDetail()">&times;</button>
+    <img id="detailImg" class="detail-img" src="" alt="">
+    <div class="detail-body">
+      <h2 id="detailTitle"></h2>
+      <div class="meta-row" id="detailMeta"></div>
+      <span class="badge" id="detailBadge" style="margin-bottom:16px;"></span>
+      <div class="desc" id="detailDesc"></div>
+
+      <div id="claimPrompt">
+        <button class="take-btn" onclick="showClaimBox()">I'll have it!</button>
+      </div>
+
+      <div class="claim-box" id="claimBox" style="display:none;">
+        <p>Leave a short message for whoever posted this. They'll see it when they check their reference — no email needed on either side.</p>
+        <textarea id="claimMessage" placeholder="e.g. I'd love this — I can pick up any evening this week."></textarea>
+        <span class="optional-label">Optional — a way to reach you, if you'd like (phone, an email, anything)</span>
+        <input type="text" id="claimContact" placeholder="Optional contact info">
+        <div class="form-actions">
+          <button class="btn btn-gold" id="sendMsgBtn" style="width:100%;padding:12px;" onclick="sendClaimMessage()">Send message</button>
+        </div>
+        <div class="sent-note" id="claimSentNote">Message sent. The poster will see it when they check their reference.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- POST ITEM MODAL -->
+<div class="overlay" id="postOverlay">
+  <div class="modal">
+    <button class="modal-close" onclick="closePostModal()">&times;</button>
+    <div class="form-body">
+      <h2>Give an item</h2>
+      <div class="sub">Add a photo and a few details. It'll appear on the board right away — no name or contact info is published.</div>
+
+      <label>Photo</label>
+      <div class="drop" id="dropZone">
+        <div id="dropPrompt">
+          <span style="display:block;margin-bottom:12px;">Add a photo of the item</span>
+          <div class="photo-choice">
+            <button type="button" class="btn btn-ghost" onclick="document.getElementById('cameraInput').click()">Take photo</button>
+            <button type="button" class="btn btn-ghost" onclick="document.getElementById('fileInput').click()">Choose from device</button>
+          </div>
+        </div>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" style="display:none">
+      <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none">
+      <button type="button" class="btn-ghost" id="retakeBtn" style="display:none;border:1.5px solid var(--line);color:var(--muted);background:transparent;border-radius:3px;padding:8px 14px;font-size:0.82rem;margin-top:10px;cursor:pointer;" onclick="resetPhoto()">Remove photo, choose another</button>
+      <div class="err" id="imgErr">Please add a photo before posting.</div>
+
+      <label>Item title</label>
+      <input type="text" id="itemTitle" placeholder="e.g. Wooden bookshelf, good condition">
+
+      <label>Condition</label>
+      <select id="itemCondition" style="width:100%;border:1px solid var(--line);border-radius:3px;padding:11px 12px;font-family:'Work Sans',sans-serif;font-size:0.95rem;background:#fff;color:var(--ink);">
+        <option value="" disabled selected>Select condition</option>
+        <option value="Like New">Like New — barely used, no visible wear</option>
+        <option value="Good">Good — works well, some signs of use</option>
+        <option value="Well-Loved">Well-Loved — fully functional, shows its age</option>
+      </select>
+      <div class="err" id="conditionErr">Please select a condition.</div>
+
+      <label>Details</label>
+      <textarea id="itemDesc" placeholder="Size, condition, pickup location, anything a new owner should know"></textarea>
+
+      <label>Your email</label>
+      <input type="email" id="ownerEmail" placeholder="you@example.com">
+      <div class="field-note">Only used to open your own mail app so you can send yourself the reference code. It's never saved or shown on the site.</div>
+      <div class="err" id="formErr">Please fill in a title, details, and a valid email.</div>
+
+      <div class="form-actions">
+        <button class="btn btn-gold" id="submitBtn" style="width:100%;padding:14px;" onclick="submitItem()">Post to the board</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRMATION MODAL -->
+<div class="overlay" id="confirmOverlay">
+  <div class="modal" style="max-width:440px;">
+    <button class="modal-close" onclick="closeConfirm()">&times;</button>
+    <div class="confirm-body">
+      <div class="mark">✓</div>
+      <h2 style="margin:0;font-size:1.3rem;">Posted to the board</h2>
+      <p>This is your private reference code. It's the only way to check messages about this item — keep it somewhere safe.</p>
+      <div class="ref-code" id="refCodeDisplay"></div>
+      <p>The site never stores your email. Tap below to email yourself this reference from your own mail app.</p>
+      <div class="confirm-actions">
+        <a class="btn btn-ghost" id="emailRefLink" href="#" style="text-decoration:none;display:inline-block;">Email me this reference</a>
+        <button class="btn btn-primary" onclick="closeConfirm()">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LOOKUP MODAL -->
+<div class="overlay" id="lookupOverlay">
+  <div class="modal" style="max-width:480px;">
+    <button class="modal-close" onclick="closeLookupModal()">&times;</button>
+    <div class="confirm-body">
+      <h2 style="margin:0 0 6px;font-size:1.3rem;">Check your listing</h2>
+      <p>Enter the reference code you got when you posted, to see any messages left for you.</p>
+      <input type="text" id="lookupRefInput" placeholder="e.g. GV-4X7QRT" style="text-align:center;text-transform:uppercase;letter-spacing:1px;font-family:'Fraunces',serif;font-weight:600;font-size:1.1rem;padding:12px;border:1px solid var(--line);border-radius:4px;width:100%;">
+      <div class="form-actions">
+        <button class="btn btn-primary" id="lookupBtn" style="width:100%;padding:12px;" onclick="doLookup()">View messages</button>
+      </div>
+      <div class="err" id="lookupErr" style="text-align:center;">No listing found with that reference.</div>
+      <div class="lookup-list" id="lookupResults"></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import {
+  getFirestore, collection, doc, setDoc, addDoc, getDocs,
+  onSnapshot, query, orderBy, where, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCEnWAqRLRMjcDNj-5_eI5KvjalSrlOf9A",
+  authDomain: "give-board.firebaseapp.com",
+  projectId: "give-board",
+  storageBucket: "give-board.firebasestorage.app",
+  messagingSenderId: "1011300803164",
+  appId: "1:1011300803164:web:3a6afeeefb531420b17c99"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const MAX_IMAGE_CHARS = 700 * 1024; // keeps the item doc safely under Firestore's 1MiB limit
+
+let items = [];
+let pendingImage = null;
+let activeItem = null;
+
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function genReference(){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = 'GV-';
+  for(let i=0;i<6;i++) code += chars[Math.floor(Math.random()*chars.length)];
+  return code;
+}
+
+function subscribeItems(){
+  const q = query(collection(db, 'items'), orderBy('postedAt', 'desc'));
+  onSnapshot(q, snapshot => {
+    items = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    render();
+  }, err => {
+    console.error('Failed to load items', err);
+  });
+}
+
+function badgeClass(cond){
+  if(cond === 'Like New') return 'badge-likenew';
+  if(cond === 'Good') return 'badge-good';
+  return 'badge-wellloved';
+}
+
+function render(){
+  const wrap = document.getElementById('gridWrap');
+  const count = document.getElementById('itemCount');
+  count.textContent = items.length === 1 ? '1 item' : items.length + ' items';
+
+  if(items.length === 0){
+    wrap.innerHTML = `<div class="empty"><strong>The board is empty</strong>Be the first to give something away.</div>`;
+    return;
+  }
+
+  wrap.innerHTML = `<div class="grid">` + items.map((it, i) => {
+    const rot = (i % 5 - 2) * 0.6;
+    const date = it.postedAt ? it.postedAt.toDate().toLocaleDateString(undefined, {month:'short', day:'numeric'}) : 'just now';
+    return `
+      <div class="card" style="--r:${rot}deg" onclick="openDetail('${it.id}')">
+        <div class="pin"></div>
+        <img src="${it.image}" alt="${escapeHtml(it.title)}">
+        <h3>${escapeHtml(it.title)}</h3>
+        <div class="meta">Posted ${date}</div>
+        <span class="badge ${badgeClass(it.condition)}">${escapeHtml(it.condition || 'Good')}</span>
+      </div>`;
+  }).join('') + `</div>`;
+}
+
+/* ---- post modal ---- */
+function openPostModal(){
+  document.getElementById('postOverlay').classList.add('open');
+}
+function closePostModal(){
+  document.getElementById('postOverlay').classList.remove('open');
+  document.getElementById('itemTitle').value = '';
+  document.getElementById('itemCondition').value = '';
+  document.getElementById('itemDesc').value = '';
+  document.getElementById('ownerEmail').value = '';
+  document.getElementById('formErr').textContent = 'Please fill in a title, details, and a valid email.';
+  document.getElementById('formErr').style.display = 'none';
+  document.getElementById('imgErr').textContent = 'Please add a photo before posting.';
+  document.getElementById('imgErr').style.display = 'none';
+  document.getElementById('conditionErr').style.display = 'none';
+  resetPhoto();
+}
+
+function resetPhoto(){
+  pendingImage = null;
+  const dz = document.getElementById('dropZone');
+  dz.classList.remove('has-img');
+  dz.innerHTML = `<div id="dropPrompt">
+      <span style="display:block;margin-bottom:12px;">Add a photo of the item</span>
+      <div class="photo-choice">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('cameraInput').click()">Take photo</button>
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('fileInput').click()">Choose from device</button>
+      </div>
+    </div>`;
+  document.getElementById('retakeBtn').style.display = 'none';
+  document.getElementById('fileInput').value = '';
+  document.getElementById('cameraInput').value = '';
+}
+
+function handlePhotoFile(file){
+  if(!file) return;
+  const img = new Image();
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    img.onload = function(){
+      const canvas = document.createElement('canvas');
+      const maxW = 700;
+      const scale = Math.min(1, maxW / img.width);
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      let dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+      if(dataUrl.length > MAX_IMAGE_CHARS){
+        dataUrl = canvas.toDataURL('image/jpeg', 0.35);
+      }
+      if(dataUrl.length > MAX_IMAGE_CHARS){
+        document.getElementById('imgErr').textContent = 'That photo is too large even after compression — please try a simpler photo or a tighter crop.';
+        document.getElementById('imgErr').style.display = 'block';
+        return;
+      }
+
+      pendingImage = dataUrl;
+      const dz = document.getElementById('dropZone');
+      dz.classList.add('has-img');
+      dz.innerHTML = `<img src="${pendingImage}">`;
+      document.getElementById('retakeBtn').style.display = 'inline-block';
+      document.getElementById('imgErr').style.display = 'none';
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+document.getElementById('fileInput').addEventListener('change', function(e){
+  handlePhotoFile(e.target.files[0]);
+});
+document.getElementById('cameraInput').addEventListener('change', function(e){
+  handlePhotoFile(e.target.files[0]);
+});
+
+async function submitItem(){
+  const title = document.getElementById('itemTitle').value.trim();
+  const condition = document.getElementById('itemCondition').value;
+  const desc = document.getElementById('itemDesc').value.trim();
+  const email = document.getElementById('ownerEmail').value.trim();
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  document.getElementById('imgErr').style.display = pendingImage ? 'none' : 'block';
+  document.getElementById('conditionErr').style.display = condition ? 'none' : 'block';
+  document.getElementById('formErr').style.display = (title && desc && emailOk) ? 'none' : 'block';
+
+  if(!pendingImage || !title || !condition || !desc || !emailOk) return;
+
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Posting…';
+
+  try{
+    const reference = genReference();
+    // NOTE: email is intentionally NOT sent to Firestore — it never touches
+    // shared storage, so it can never be displayed to other visitors.
+    const itemRef = doc(collection(db, 'items'));
+    await setDoc(itemRef, {
+      title, condition, description: desc,
+      image: pendingImage, reference, postedAt: serverTimestamp()
+    });
+
+    closePostModal();
+
+    document.getElementById('refCodeDisplay').textContent = reference;
+    const subject = encodeURIComponent('Your Give Board reference — ' + reference);
+    const body = encodeURIComponent(
+      `Hi,\n\nThis is a record of your Give Board listing.\n\nItem: ${title}\nReference: ${reference}\n\nKeep this reference private — it's the only way to view messages about this listing.`
+    );
+    document.getElementById('emailRefLink').href = `mailto:${encodeURIComponent(email)}?subject=${subject}&body=${body}`;
+    document.getElementById('confirmOverlay').classList.add('open');
+  }catch(e){
+    console.error('Failed to post item', e);
+    const formErr = document.getElementById('formErr');
+    formErr.textContent = 'Something went wrong posting your item. Please try again.';
+    formErr.style.display = 'block';
+  }finally{
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Post to the board';
+  }
+}
+
+function closeConfirm(){
+  document.getElementById('confirmOverlay').classList.remove('open');
+}
+
+/* ---- detail modal ---- */
+function openDetail(id){
+  const it = items.find(x => x.id === id);
+  if(!it) return;
+  activeItem = it;
+  document.getElementById('detailImg').src = it.image;
+  document.getElementById('detailTitle').textContent = it.title;
+  document.getElementById('detailMeta').textContent =
+    'Posted ' + (it.postedAt ? it.postedAt.toDate().toLocaleDateString(undefined,{month:'short', day:'numeric', year:'numeric'}) : 'just now');
+  const badgeEl = document.getElementById('detailBadge');
+  badgeEl.textContent = it.condition || 'Good';
+  badgeEl.className = 'badge ' + badgeClass(it.condition);
+  document.getElementById('detailDesc').textContent = it.description;
+
+  document.getElementById('claimPrompt').style.display = 'block';
+  document.getElementById('claimBox').style.display = 'none';
+  document.getElementById('claimMessage').value = '';
+  document.getElementById('claimContact').value = '';
+  document.getElementById('claimSentNote').style.display = 'none';
+
+  document.getElementById('detailOverlay').classList.add('open');
+}
+function closeDetail(){
+  document.getElementById('detailOverlay').classList.remove('open');
+}
+function showClaimBox(){
+  document.getElementById('claimPrompt').style.display = 'none';
+  document.getElementById('claimBox').style.display = 'block';
+}
+async function sendClaimMessage(){
+  const text = document.getElementById('claimMessage').value.trim();
+  const contact = document.getElementById('claimContact').value.trim();
+  if(!text || !activeItem) return;
+
+  const sendBtn = document.getElementById('sendMsgBtn');
+  sendBtn.disabled = true;
+  sendBtn.textContent = 'Sending…';
+  try{
+    await addDoc(collection(db, 'items', activeItem.id, 'messages'), {
+      text, contact: contact || null, sentAt: serverTimestamp()
+    });
+    document.getElementById('claimBox').style.display = 'none';
+    document.getElementById('claimSentNote').style.display = 'block';
+  }catch(e){
+    console.error('Failed to send message', e);
+  }finally{
+    sendBtn.disabled = false;
+    sendBtn.textContent = 'Send message';
+  }
+}
+
+/* ---- lookup modal ---- */
+function openLookupModal(){
+  document.getElementById('lookupRefInput').value = '';
+  document.getElementById('lookupErr').style.display = 'none';
+  document.getElementById('lookupResults').innerHTML = '';
+  document.getElementById('lookupOverlay').classList.add('open');
+}
+function closeLookupModal(){
+  document.getElementById('lookupOverlay').classList.remove('open');
+}
+async function doLookup(){
+  const ref = document.getElementById('lookupRefInput').value.trim().toUpperCase();
+  const results = document.getElementById('lookupResults');
+  const err = document.getElementById('lookupErr');
+  const lookupBtn = document.getElementById('lookupBtn');
+
+  lookupBtn.disabled = true;
+  lookupBtn.textContent = 'Looking up…';
+  try{
+    const q = query(collection(db, 'items'), where('reference', '==', ref));
+    const snap = await getDocs(q);
+
+    if(snap.empty){
+      err.style.display = 'block';
+      results.innerHTML = '';
+      return;
+    }
+    err.style.display = 'none';
+    const it = snap.docs[0];
+
+    const msgsSnap = await getDocs(query(collection(db, 'items', it.id, 'messages'), orderBy('sentAt', 'desc')));
+    const msgs = msgsSnap.docs.map(d => d.data());
+
+    if(msgs.length === 0){
+      results.innerHTML = `<p style="text-align:center;">"${escapeHtml(it.data().title)}" — no messages yet.</p>`;
+      return;
+    }
+    results.innerHTML = `<p style="text-align:center;margin-bottom:14px;">Messages for "${escapeHtml(it.data().title)}"</p>` +
+      msgs.map(m => `
+        <div class="msg-item">
+          <div class="msg-text">${escapeHtml(m.text)}</div>
+          <div class="msg-meta">${m.contact ? 'Contact: ' + escapeHtml(m.contact) + ' · ' : ''}${m.sentAt ? m.sentAt.toDate().toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : 'just now'}</div>
+        </div>`).join('');
+  }catch(e){
+    console.error('Failed to look up listing', e);
+    err.style.display = 'block';
+    results.innerHTML = '';
+  }finally{
+    lookupBtn.disabled = false;
+    lookupBtn.textContent = 'View messages';
+  }
+}
+
+document.querySelectorAll('.overlay').forEach(ov => {
+  ov.addEventListener('click', e => { if(e.target === ov) ov.classList.remove('open'); });
+});
+
+window.openPostModal = openPostModal;
+window.closePostModal = closePostModal;
+window.resetPhoto = resetPhoto;
+window.submitItem = submitItem;
+window.openDetail = openDetail;
+window.closeDetail = closeDetail;
+window.showClaimBox = showClaimBox;
+window.sendClaimMessage = sendClaimMessage;
+window.closeConfirm = closeConfirm;
+window.openLookupModal = openLookupModal;
+window.closeLookupModal = closeLookupModal;
+window.doLookup = doLookup;
+
+subscribeItems();
+</script>
+</body>
+</html>
