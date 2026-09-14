@@ -294,7 +294,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
 import {
-  getFirestore, collection, doc, setDoc, addDoc, getDocs,
+  getFirestore, collection, doc, setDoc, addDoc, getDocs, updateDoc,
   onSnapshot, query, orderBy, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 
@@ -329,7 +329,9 @@ function genReference(){
 function subscribeItems(){
   const q = query(collection(db, 'items'), orderBy('postedAt', 'desc'));
   onSnapshot(q, snapshot => {
-    items = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    items = snapshot.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(it => !it.hidden);
     render();
   }, err => {
     console.error('Failed to load items', err);
@@ -550,17 +552,60 @@ function openLookupModal(){
   document.getElementById('lookupRefInput').value = '';
   document.getElementById('lookupErr').style.display = 'none';
   document.getElementById('lookupResults').innerHTML = '';
+  lookupItem = null;
+  lookupConfirmingCancel = false;
   document.getElementById('lookupOverlay').classList.add('open');
 }
 function closeLookupModal(){
   document.getElementById('lookupOverlay').classList.remove('open');
 }
+let lookupItem = null; // { id, title } for the currently displayed lookup result
+let lookupConfirmingCancel = false;
+
+function renderLookupResult(msgs, hidden){
+  const results = document.getElementById('lookupResults');
+  const title = lookupItem.title;
+  const msgsHtml = msgs.length === 0
+    ? `<p style="text-align:center;">No messages yet.</p>`
+    : msgs.map(m => `
+        <div class="msg-item">
+          <div class="msg-text">${escapeHtml(m.text)}</div>
+          <div class="msg-meta">${m.contact ? 'Contact: ' + escapeHtml(m.contact) + ' · ' : ''}${m.sentAt ? m.sentAt.toDate().toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : 'just now'}</div>
+        </div>`).join('');
+
+  let actionHtml;
+  if(hidden){
+    actionHtml = `<p style="text-align:center;color:var(--forest);margin-top:14px;">This listing has been removed from the board.</p>`;
+  }else if(lookupConfirmingCancel){
+    actionHtml = `
+      <p style="text-align:center;margin-top:14px;">Remove this listing from the board? This can't be undone.</p>
+      <div class="confirm-actions" style="margin-top:10px;">
+        <button class="btn btn-ghost" onclick="cancelCancelListing()">Never mind</button>
+        <button class="btn btn-primary" style="background:var(--clay);" onclick="confirmCancelListing()">Yes, remove it</button>
+      </div>`;
+  }else{
+    actionHtml = `
+      <div class="form-actions">
+        <button class="btn btn-ghost" style="width:100%;border-color:var(--clay);color:var(--clay);" onclick="startCancelListing()">Cancel this listing</button>
+      </div>`;
+  }
+
+  results.innerHTML = `<p style="text-align:center;margin-bottom:14px;">Messages for "${escapeHtml(title)}"</p>` + msgsHtml + actionHtml;
+}
+
+async function fetchLookupMessages(){
+  const msgsSnap = await getDocs(query(collection(db, 'items', lookupItem.id, 'messages'), orderBy('sentAt', 'desc')));
+  return msgsSnap.docs.map(d => d.data());
+}
+
 async function doLookup(){
   const ref = document.getElementById('lookupRefInput').value.trim().toUpperCase();
   const results = document.getElementById('lookupResults');
   const err = document.getElementById('lookupErr');
   const lookupBtn = document.getElementById('lookupBtn');
 
+  lookupItem = null;
+  lookupConfirmingCancel = false;
   lookupBtn.disabled = true;
   lookupBtn.textContent = 'Looking up…';
   try{
@@ -574,20 +619,11 @@ async function doLookup(){
     }
     err.style.display = 'none';
     const it = snap.docs[0];
+    lookupItem = { id: it.id, title: it.data().title };
+    const hidden = !!it.data().hidden;
 
-    const msgsSnap = await getDocs(query(collection(db, 'items', it.id, 'messages'), orderBy('sentAt', 'desc')));
-    const msgs = msgsSnap.docs.map(d => d.data());
-
-    if(msgs.length === 0){
-      results.innerHTML = `<p style="text-align:center;">"${escapeHtml(it.data().title)}" — no messages yet.</p>`;
-      return;
-    }
-    results.innerHTML = `<p style="text-align:center;margin-bottom:14px;">Messages for "${escapeHtml(it.data().title)}"</p>` +
-      msgs.map(m => `
-        <div class="msg-item">
-          <div class="msg-text">${escapeHtml(m.text)}</div>
-          <div class="msg-meta">${m.contact ? 'Contact: ' + escapeHtml(m.contact) + ' · ' : ''}${m.sentAt ? m.sentAt.toDate().toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : 'just now'}</div>
-        </div>`).join('');
+    const msgs = hidden ? [] : await fetchLookupMessages();
+    renderLookupResult(msgs, hidden);
   }catch(e){
     console.error('Failed to look up listing', e);
     err.style.display = 'block';
@@ -595,6 +631,26 @@ async function doLookup(){
   }finally{
     lookupBtn.disabled = false;
     lookupBtn.textContent = 'View messages';
+  }
+}
+
+async function startCancelListing(){
+  lookupConfirmingCancel = true;
+  renderLookupResult(await fetchLookupMessages(), false);
+}
+
+async function cancelCancelListing(){
+  lookupConfirmingCancel = false;
+  renderLookupResult(await fetchLookupMessages(), false);
+}
+
+async function confirmCancelListing(){
+  try{
+    await updateDoc(doc(db, 'items', lookupItem.id), { hidden: true });
+    lookupConfirmingCancel = false;
+    renderLookupResult([], true);
+  }catch(e){
+    console.error('Failed to cancel listing', e);
   }
 }
 
@@ -606,6 +662,9 @@ window.openPostModal = openPostModal;
 window.closePostModal = closePostModal;
 window.resetPhoto = resetPhoto;
 window.submitItem = submitItem;
+window.startCancelListing = startCancelListing;
+window.cancelCancelListing = cancelCancelListing;
+window.confirmCancelListing = confirmCancelListing;
 window.openDetail = openDetail;
 window.closeDetail = closeDetail;
 window.showClaimBox = showClaimBox;
