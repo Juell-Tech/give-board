@@ -235,6 +235,7 @@
       <input type="file" id="fileInput" accept="image/*" style="display:none">
       <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none">
       <button type="button" class="btn-ghost" id="retakeBtn" style="display:none;border:1.5px solid var(--line);color:var(--muted);background:transparent;border-radius:3px;padding:8px 14px;font-size:0.82rem;margin-top:10px;cursor:pointer;" onclick="resetPhoto()">Remove photo, choose another</button>
+      <div class="field-note" id="photoCheckStatus" style="display:none;">Checking photo…</div>
       <div class="err" id="imgErr">Please add a photo before posting.</div>
 
       <label>Item title</label>
@@ -299,6 +300,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/nsfwjs@4.4.0/dist/browser/nsfwjs.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
 import {
@@ -396,6 +398,7 @@ function closePostModal(){
 
 function resetPhoto(){
   pendingImage = null;
+  document.getElementById('photoCheckStatus').style.display = 'none';
   const dz = document.getElementById('dropZone');
   dz.classList.remove('has-img');
   dz.innerHTML = `<div id="dropPrompt">
@@ -410,12 +413,34 @@ function resetPhoto(){
   document.getElementById('cameraInput').value = '';
 }
 
+let nsfwModelPromise = null;
+function getNsfwModel(){
+  if(!nsfwModelPromise){
+    nsfwModelPromise = window.nsfwjs.load();
+  }
+  return nsfwModelPromise;
+}
+
+async function isInappropriatePhoto(canvas){
+  try{
+    const model = await getNsfwModel();
+    const predictions = await model.classify(canvas);
+    return predictions.some(p =>
+      ((p.className === 'Porn' || p.className === 'Hentai') && p.probability > 0.7) ||
+      (p.className === 'Sexy' && p.probability > 0.9)
+    );
+  }catch(e){
+    console.error('Content check failed — allowing photo through', e);
+    return false; // fail open: a model/network hiccup shouldn't block posting entirely
+  }
+}
+
 function handlePhotoFile(file){
   if(!file) return;
   const img = new Image();
   const reader = new FileReader();
   reader.onload = function(ev){
-    img.onload = function(){
+    img.onload = async function(){
       const canvas = document.createElement('canvas');
       const maxW = 700;
       const scale = Math.min(1, maxW / img.width);
@@ -430,6 +455,17 @@ function handlePhotoFile(file){
       }
       if(dataUrl.length > MAX_IMAGE_CHARS){
         document.getElementById('imgErr').textContent = 'That photo is too large even after compression — please try a simpler photo or a tighter crop.';
+        document.getElementById('imgErr').style.display = 'block';
+        return;
+      }
+
+      document.getElementById('imgErr').style.display = 'none';
+      document.getElementById('photoCheckStatus').style.display = 'block';
+      const flagged = await isInappropriatePhoto(canvas);
+      document.getElementById('photoCheckStatus').style.display = 'none';
+
+      if(flagged){
+        document.getElementById('imgErr').textContent = "This photo was flagged as inappropriate and can't be used. Please choose a different photo.";
         document.getElementById('imgErr').style.display = 'block';
         return;
       }
