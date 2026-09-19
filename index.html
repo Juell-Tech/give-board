@@ -119,6 +119,7 @@
   .modal-close{position:absolute;top:14px;right:14px;background:var(--forest);color:var(--paper);border:none;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;line-height:1;z-index:5;}
 
   .detail-img{width:100%;max-height:360px;object-fit:cover;display:block;background:#eee;}
+  .detail-img.is-gone{filter:grayscale(1) brightness(0.9);}
   .detail-body{padding:26px 28px 30px;}
   .detail-body h2{margin:0 0 6px;font-size:1.55rem;font-weight:600;}
   .detail-body .meta-row{color:var(--muted);font-size:0.88rem;margin-bottom:16px;}
@@ -217,6 +218,10 @@
 
       <div id="claimPrompt">
         <button class="take-btn" onclick="showClaimBox()">I'll have it!</button>
+      </div>
+
+      <div id="goneNotice" style="display:none;text-align:center;padding:14px;background:var(--paper-warm);border:1px solid var(--line);border-radius:4px;color:var(--forest-dark);font-weight:600;">
+        This item has found a home.
       </div>
 
       <div class="claim-box" id="claimBox" style="display:none;">
@@ -600,7 +605,10 @@ function openDetail(id){
   badgeEl.className = 'badge ' + badgeClass(it.condition);
   document.getElementById('detailDesc').textContent = it.description;
 
-  document.getElementById('claimPrompt').style.display = 'block';
+  const gone = !!it.gone;
+  document.getElementById('detailImg').classList.toggle('is-gone', gone);
+  document.getElementById('claimPrompt').style.display = gone ? 'none' : 'block';
+  document.getElementById('goneNotice').style.display = gone ? 'block' : 'none';
   document.getElementById('claimBox').style.display = 'none';
   document.getElementById('claimMessage').value = '';
   document.getElementById('claimContact').value = '';
