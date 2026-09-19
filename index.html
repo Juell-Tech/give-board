@@ -304,7 +304,7 @@
       </div>
       <div class="err" id="lookupErr" style="text-align:center;">No listing found with that reference.</div>
       <div class="lookup-list" id="lookupResults"></div>
-      <p style="text-align:center;margin-top:16px;font-size:0.82rem;color:var(--muted);">
+      <p id="supportEmailNote" style="text-align:center;margin-top:16px;font-size:0.82rem;color:var(--muted);">
         Lost your reference code? <a id="supportEmailLink" href="#" style="color:var(--forest);font-weight:600;">Email support</a>
       </p>
     </div>
@@ -613,6 +613,7 @@ function openLookupModal(){
   document.getElementById('lookupRefInput').value = '';
   document.getElementById('lookupErr').style.display = 'none';
   document.getElementById('lookupResults').innerHTML = '';
+  document.getElementById('supportEmailNote').style.display = 'block';
   lookupItem = null;
   lookupConfirmingCancel = false;
   document.getElementById('lookupOverlay').classList.add('open');
@@ -676,9 +677,11 @@ async function doLookup(){
     if(snap.empty){
       err.style.display = 'block';
       results.innerHTML = '';
+      document.getElementById('supportEmailNote').style.display = 'block';
       return;
     }
     err.style.display = 'none';
+    document.getElementById('supportEmailNote').style.display = 'none';
     const it = snap.docs[0];
     lookupItem = { id: it.id, title: it.data().title };
     const hidden = !!it.data().hidden;
