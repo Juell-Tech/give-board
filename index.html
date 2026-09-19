@@ -691,7 +691,12 @@ function renderLookupResult(msgs, hidden){
         <button class="btn btn-primary" style="background:var(--clay);" onclick="confirmCancelListing()">Yes, remove it</button>
       </div>`;
   }else{
-    actionHtml = `
+    actionHtml = (lookupItem.gone
+      ? `<p style="text-align:center;color:var(--forest);margin-top:14px;">This item has found a home.</p>`
+      : `<div class="form-actions">
+          <button type="button" class="btn-mark-gone" onclick="markLookupItemGone()">Home Found</button>
+        </div>`
+    ) + `
       <div class="form-actions">
         <button class="btn btn-ghost" style="width:100%;border-color:var(--clay);color:var(--clay);" onclick="startCancelListing()">Cancel this listing</button>
       </div>`;
@@ -728,7 +733,7 @@ async function doLookup(){
     err.style.display = 'none';
     document.getElementById('supportEmailNote').style.display = 'none';
     const it = snap.docs[0];
-    lookupItem = { id: it.id, title: it.data().title };
+    lookupItem = { id: it.id, title: it.data().title, gone: !!it.data().gone };
     const hidden = !!it.data().hidden;
 
     const msgs = hidden ? [] : await fetchLookupMessages();
@@ -763,6 +768,16 @@ async function confirmCancelListing(){
   }
 }
 
+async function markLookupItemGone(){
+  try{
+    await markAsGone(lookupItem.id);
+    lookupItem.gone = true;
+    renderLookupResult(await fetchLookupMessages(), false);
+  }catch(e){
+    console.error('Failed to mark listing as gone', e);
+  }
+}
+
 document.querySelectorAll('.overlay').forEach(ov => {
   ov.addEventListener('click', e => { if(e.target === ov) ov.classList.remove('open'); });
 });
@@ -774,6 +789,7 @@ window.submitItem = submitItem;
 window.startCancelListing = startCancelListing;
 window.cancelCancelListing = cancelCancelListing;
 window.confirmCancelListing = confirmCancelListing;
+window.markLookupItemGone = markLookupItemGone;
 window.openDetail = openDetail;
 window.markAsGone = markAsGone;
 window.markActiveItemGone = markActiveItemGone;
