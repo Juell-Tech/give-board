@@ -62,6 +62,9 @@
   }
   .privacy-note .dot{width:8px;height:8px;border-radius:50%;background:var(--forest);margin-top:7px;flex-shrink:0;}
   .privacy-note p{margin:0;font-size:0.85rem;color:var(--forest-dark);line-height:1.5;max-width:none;}
+  .privacy-note.warn{background:#FBEBCF;max-width:none;margin-top:0;}
+  .privacy-note.warn .dot{background:var(--gold-dark);}
+  .privacy-note.warn p{color:#6B4A0E;}
 
   .board{padding:44px 6vw 90px;}
   .board-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px;}
@@ -258,6 +261,11 @@
       <div class="field-note">Only used to open your own mail app so you can send yourself the reference code. It's never saved or shown on the site.</div>
       <div class="err" id="formErr">Please fill in a title, details, and a valid email.</div>
 
+      <div class="privacy-note warn" style="margin-top:20px;">
+        <div class="dot"></div>
+        <p><strong>Keep your reference code safe.</strong> It's the only way to check messages or remove this listing later — if you lose it, there's no way to recover it or manage this posting again.</p>
+      </div>
+
       <div class="form-actions">
         <button class="btn btn-gold" id="submitBtn" style="width:100%;padding:14px;" onclick="submitItem()">Post to the board</button>
       </div>
@@ -272,7 +280,7 @@
     <div class="confirm-body">
       <div class="mark">✓</div>
       <h2 style="margin:0;font-size:1.3rem;">Posted to the board</h2>
-      <p>This is your private reference code. It's the only way to check messages about this item — keep it somewhere safe.</p>
+      <p>This is your private reference code. It's the only way to check messages or remove this listing later — <strong>keep it somewhere safe, it can't be recovered if lost.</strong></p>
       <div class="ref-code" id="refCodeDisplay"></div>
       <p>The site never stores your email. Tap below to email yourself this reference from your own mail app.</p>
       <div class="confirm-actions">
