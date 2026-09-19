@@ -218,7 +218,6 @@
 
       <div id="claimPrompt">
         <button class="take-btn" onclick="showClaimBox()">I'll have it!</button>
-        <button type="button" class="btn-mark-gone" onclick="markActiveItemGone()">Home Found</button>
       </div>
 
       <div id="goneNotice" style="display:none;text-align:center;padding:14px;background:var(--paper-warm);border:1px solid var(--line);border-radius:4px;color:var(--forest-dark);font-weight:600;">
@@ -591,14 +590,6 @@ async function markAsGone(itemId){
   }
 }
 
-async function markActiveItemGone(){
-  if(!activeItem) return;
-  await markAsGone(activeItem.id);
-  document.getElementById('detailImg').classList.add('is-gone');
-  document.getElementById('claimPrompt').style.display = 'none';
-  document.getElementById('goneNotice').style.display = 'block';
-}
-
 /* ---- detail modal ---- */
 function openDetail(id){
   const it = items.find(x => x.id === id);
@@ -805,8 +796,6 @@ window.confirmCancelListing = confirmCancelListing;
 window.markLookupItemGone = markLookupItemGone;
 window.relistLookupItem = relistLookupItem;
 window.openDetail = openDetail;
-window.markAsGone = markAsGone;
-window.markActiveItemGone = markActiveItemGone;
 window.closeDetail = closeDetail;
 window.showClaimBox = showClaimBox;
 window.sendClaimMessage = sendClaimMessage;
