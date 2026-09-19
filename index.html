@@ -692,7 +692,10 @@ function renderLookupResult(msgs, hidden){
       </div>`;
   }else{
     actionHtml = (lookupItem.gone
-      ? `<p style="text-align:center;color:var(--forest);margin-top:14px;">This item has found a home.</p>`
+      ? `<p style="text-align:center;color:var(--forest);margin-top:14px;">This item has found a home.</p>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" style="width:100%;" onclick="relistLookupItem()">Re-List</button>
+        </div>`
       : `<div class="form-actions">
           <button type="button" class="btn-mark-gone" onclick="markLookupItemGone()">Home Found</button>
         </div>`
@@ -778,6 +781,16 @@ async function markLookupItemGone(){
   }
 }
 
+async function relistLookupItem(){
+  try{
+    await updateDoc(doc(db, 'items', lookupItem.id), { gone: false });
+    lookupItem.gone = false;
+    renderLookupResult(await fetchLookupMessages(), false);
+  }catch(e){
+    console.error('Failed to re-list item', e);
+  }
+}
+
 document.querySelectorAll('.overlay').forEach(ov => {
   ov.addEventListener('click', e => { if(e.target === ov) ov.classList.remove('open'); });
 });
@@ -790,6 +803,7 @@ window.startCancelListing = startCancelListing;
 window.cancelCancelListing = cancelCancelListing;
 window.confirmCancelListing = confirmCancelListing;
 window.markLookupItemGone = markLookupItemGone;
+window.relistLookupItem = relistLookupItem;
 window.openDetail = openDetail;
 window.markAsGone = markAsGone;
 window.markActiveItemGone = markActiveItemGone;

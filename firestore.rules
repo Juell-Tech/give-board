@@ -24,7 +24,7 @@ service cloud.firestore {
                     || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hidden'])
                         && request.resource.data.hidden == true)
                     || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['gone'])
-                        && request.resource.data.gone == true);
+                        && request.resource.data.gone is bool);
       allow delete: if isAdmin();
 
       match /messages/{messageId} {
