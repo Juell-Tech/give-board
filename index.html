@@ -218,6 +218,7 @@
 
       <div id="claimPrompt">
         <button class="take-btn" onclick="showClaimBox()">I'll have it!</button>
+        <button type="button" class="btn-mark-gone" onclick="markActiveItemGone()">Home Found</button>
       </div>
 
       <div id="goneNotice" style="display:none;text-align:center;padding:14px;background:var(--paper-warm);border:1px solid var(--line);border-radius:4px;color:var(--forest-dark);font-weight:600;">
@@ -416,7 +417,6 @@ function render(){
         <h3>${escapeHtml(it.title)}</h3>
         <div class="meta">Posted ${date}</div>
         <span class="badge ${badgeClass(it.condition)}">${escapeHtml(it.condition || 'Good')}</span>
-        ${gone ? '' : `<button type="button" class="btn-mark-gone" onclick="event.stopPropagation(); markAsGone('${it.id}')">Home Found</button>`}
       </div>`;
   }).join('') + `</div>`;
 }
@@ -589,6 +589,14 @@ async function markAsGone(itemId){
   }catch(e){
     console.error('Failed to mark item as gone', e);
   }
+}
+
+async function markActiveItemGone(){
+  if(!activeItem) return;
+  await markAsGone(activeItem.id);
+  document.getElementById('detailImg').classList.add('is-gone');
+  document.getElementById('claimPrompt').style.display = 'none';
+  document.getElementById('goneNotice').style.display = 'block';
 }
 
 /* ---- detail modal ---- */
@@ -768,6 +776,7 @@ window.cancelCancelListing = cancelCancelListing;
 window.confirmCancelListing = confirmCancelListing;
 window.openDetail = openDetail;
 window.markAsGone = markAsGone;
+window.markActiveItemGone = markActiveItemGone;
 window.closeDetail = closeDetail;
 window.showClaimBox = showClaimBox;
 window.sendClaimMessage = sendClaimMessage;
