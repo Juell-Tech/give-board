@@ -22,7 +22,9 @@ service cloud.firestore {
                     && request.resource.data.postedAt == request.time;
       allow update: if isAdmin()
                     || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hidden'])
-                        && request.resource.data.hidden == true);
+                        && request.resource.data.hidden == true)
+                    || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['gone'])
+                        && request.resource.data.gone == true);
       allow delete: if isAdmin();
 
       match /messages/{messageId} {

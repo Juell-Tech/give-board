@@ -86,6 +86,22 @@
   .card img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;border:1px solid var(--line);background:#eee;}
   .card h3{font-size:1.02rem;margin:10px 0 4px;font-weight:600;line-height:1.25;}
   .card .meta{font-size:0.8rem;color:var(--muted);}
+  .card-photo{position:relative;}
+  .card-photo img.is-gone{filter:grayscale(1) brightness(0.9);}
+  .gone-overlay{
+    position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    background:rgba(0,0,0,0.15);
+  }
+  .gone-overlay .tick{font-size:2.8rem;line-height:1;color:#3FA65C;text-shadow:0 1px 3px rgba(0,0,0,.4);}
+  .gone-overlay .label{
+    font-family:'Fraunces',serif;font-weight:700;font-size:1.15rem;color:#fff;
+    text-shadow:0 1px 3px rgba(0,0,0,.5);letter-spacing:.5px;
+  }
+  .btn-mark-gone{
+    display:block;width:100%;margin-top:10px;padding:9px 10px;border:none;border-radius:3px;
+    background:#4CAF50;color:#fff;font-family:'Work Sans',sans-serif;font-weight:600;font-size:0.82rem;cursor:pointer;
+  }
+  .btn-mark-gone:hover{background:#409a44;}
   .badge{
     display:inline-block;font-size:0.72rem;font-weight:600;padding:3px 9px;border-radius:20px;
     letter-spacing:.2px;margin-top:6px;
@@ -384,13 +400,18 @@ function render(){
   wrap.innerHTML = `<div class="grid">` + items.map((it, i) => {
     const rot = (i % 5 - 2) * 0.6;
     const date = it.postedAt ? it.postedAt.toDate().toLocaleDateString(undefined, {month:'short', day:'numeric'}) : 'just now';
+    const gone = !!it.gone;
     return `
       <div class="card" style="--r:${rot}deg" onclick="openDetail('${it.id}')">
         <div class="pin"></div>
-        <img src="${it.image}" alt="${escapeHtml(it.title)}">
+        <div class="card-photo">
+          <img src="${it.image}" alt="${escapeHtml(it.title)}" class="${gone ? 'is-gone' : ''}">
+          ${gone ? `<div class="gone-overlay"><div class="tick">✓</div><div class="label">Gone</div></div>` : ''}
+        </div>
         <h3>${escapeHtml(it.title)}</h3>
         <div class="meta">Posted ${date}</div>
         <span class="badge ${badgeClass(it.condition)}">${escapeHtml(it.condition || 'Good')}</span>
+        ${gone ? '' : `<button type="button" class="btn-mark-gone" onclick="event.stopPropagation(); markAsGone('${it.id}')">Home Found</button>`}
       </div>`;
   }).join('') + `</div>`;
 }
@@ -555,6 +576,14 @@ async function submitItem(){
 
 function closeConfirm(){
   document.getElementById('confirmOverlay').classList.remove('open');
+}
+
+async function markAsGone(itemId){
+  try{
+    await updateDoc(doc(db, 'items', itemId), { gone: true });
+  }catch(e){
+    console.error('Failed to mark item as gone', e);
+  }
 }
 
 /* ---- detail modal ---- */
@@ -730,6 +759,7 @@ window.startCancelListing = startCancelListing;
 window.cancelCancelListing = cancelCancelListing;
 window.confirmCancelListing = confirmCancelListing;
 window.openDetail = openDetail;
+window.markAsGone = markAsGone;
 window.closeDetail = closeDetail;
 window.showClaimBox = showClaimBox;
 window.sendClaimMessage = sendClaimMessage;
