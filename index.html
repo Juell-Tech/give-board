@@ -57,7 +57,8 @@
   }
   .hero h1{font-size:clamp(2.1rem,4vw,3.1rem);line-height:1.08;margin:0 0 14px;font-weight:600;max-width:620px;}
   .hero p{color:var(--muted);max-width:420px;margin:0;line-height:1.55;}
-  .hero-image{flex:1 1 340px;max-width:420px;}
+  .hero-images{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:20px;flex:2 1 600px;}
+  .hero-image{flex:1 1 260px;max-width:340px;}
   .hero-image img{
     width:100%;height:auto;display:block;border-radius:6px;
     box-shadow:0 24px 48px -12px rgba(33,50,42,0.35), 0 8px 16px -8px rgba(33,50,42,0.2);
@@ -199,8 +200,13 @@
       <p>Nobody's name or email is ever shown on this site. Posting gives you a private reference code — that's the only thing needed to give an item away or check messages about it.</p>
     </div>
   </div>
-  <div class="hero-image">
-    <img src="hero.jpg" alt="Two people carrying a sofa together">
+  <div class="hero-images">
+    <div class="hero-image">
+      <img src="hero.jpg" alt="Two people carrying a sofa together">
+    </div>
+    <div class="hero-image">
+      <img src="boots.jpg" alt="Cartoon of boots going from unwanted and dusty to loved and shined">
+    </div>
   </div>
 </section>
 
