@@ -178,6 +178,7 @@
     <span class="tag">— pass it on</span>
   </div>
   <div class="header-actions">
+    <button class="btn btn-ghost" id="myListingsBtn" onclick="openMyListingsModal()">My Listings</button>
     <button class="btn btn-ghost" onclick="openLookupModal()">Check your listing</button>
     <button class="btn btn-primary" onclick="openPostModal()">Give an item</button>
   </div>
@@ -328,6 +329,21 @@
       <p id="supportEmailNote" style="text-align:center;margin-top:16px;font-size:0.82rem;color:var(--muted);">
         Lost your reference code? <a id="supportEmailLink" href="#" style="color:var(--forest);font-weight:600;">Email support</a>
       </p>
+    </div>
+  </div>
+</div>
+
+<!-- MY LISTINGS MODAL -->
+<div class="overlay" id="myListingsOverlay">
+  <div class="modal" style="max-width:520px;">
+    <button class="modal-close" onclick="closeMyListingsModal()">&times;</button>
+    <div class="confirm-body">
+      <h2 style="margin:0 0 6px;font-size:1.3rem;">My Listings</h2>
+      <p>Items you've posted from this browser. This list is saved only on this device — nobody else can see it.</p>
+      <div class="form-actions">
+        <button class="btn btn-ghost" style="width:100%;" onclick="downloadMyListings()">Download my listings</button>
+      </div>
+      <div id="myListingsContent" style="margin-top:16px;text-align:left;"></div>
     </div>
   </div>
 </div>
@@ -558,6 +574,7 @@ async function submitItem(){
       image: pendingImage, reference, postedAt: serverTimestamp()
     });
 
+    saveMyListingsEntry({ title, reference, postedAt: Date.now() });
     closePostModal();
 
     document.getElementById('refCodeDisplay').textContent = reference;
@@ -642,6 +659,106 @@ async function sendClaimMessage(){
     sendBtn.disabled = false;
     sendBtn.textContent = 'Send message';
   }
+}
+
+/* ---- my listings (saved locally on this device) ---- */
+const MY_LISTINGS_KEY = 'give-board-my-listings';
+
+function getMyListings(){
+  try{
+    const raw = localStorage.getItem(MY_LISTINGS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  }catch(e){
+    return [];
+  }
+}
+
+function saveMyListings(list){
+  try{
+    localStorage.setItem(MY_LISTINGS_KEY, JSON.stringify(list));
+  }catch(e){
+    console.error('Failed to save My Listings to this browser', e);
+  }
+  updateMyListingsBtn();
+}
+
+function saveMyListingsEntry(entry){
+  const list = getMyListings();
+  list.unshift(entry);
+  saveMyListings(list);
+}
+
+function removeMyListingsEntry(reference){
+  const list = getMyListings().filter(e => e.reference !== reference);
+  saveMyListings(list);
+  renderMyListingsContent();
+}
+
+function updateMyListingsBtn(){
+  const count = getMyListings().length;
+  document.getElementById('myListingsBtn').textContent = count > 0 ? `My Listings (${count})` : 'My Listings';
+}
+
+function renderMyListingsContent(){
+  const list = getMyListings();
+  const wrap = document.getElementById('myListingsContent');
+  if(list.length === 0){
+    wrap.innerHTML = `<p style="text-align:center;color:var(--muted);">You haven't posted anything from this device yet.</p>`;
+    return;
+  }
+  wrap.innerHTML = list.map(entry => {
+    const date = new Date(entry.postedAt).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
+    return `
+      <div class="msg-item" style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <div>
+          <div style="font-weight:600;">${escapeHtml(entry.title)}</div>
+          <div class="msg-meta">${escapeHtml(entry.reference)} · Posted ${date}</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-shrink:0;">
+          <button type="button" class="btn btn-ghost" style="padding:6px 10px;font-size:0.78rem;" onclick="checkMyListing('${escapeHtml(entry.reference)}')">Check</button>
+          <button type="button" class="btn btn-ghost" style="padding:6px 10px;font-size:0.78rem;border-color:var(--clay);color:var(--clay);" onclick="removeMyListingsEntry('${escapeHtml(entry.reference)}')">Remove</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function openMyListingsModal(){
+  renderMyListingsContent();
+  document.getElementById('myListingsOverlay').classList.add('open');
+}
+function closeMyListingsModal(){
+  document.getElementById('myListingsOverlay').classList.remove('open');
+}
+
+function checkMyListing(reference){
+  closeMyListingsModal();
+  openLookupModal();
+  document.getElementById('lookupRefInput').value = reference;
+  doLookup();
+}
+
+function downloadMyListings(){
+  const list = getMyListings();
+  const lines = ['The Give Board — My Listings', 'Exported ' + new Date().toLocaleString(), ''];
+  if(list.length === 0){
+    lines.push("You haven't posted anything from this device yet.");
+  }else{
+    list.forEach(entry => {
+      lines.push('Title: ' + entry.title);
+      lines.push('Reference: ' + entry.reference);
+      lines.push('Posted: ' + new Date(entry.postedAt).toLocaleDateString());
+      lines.push('');
+    });
+  }
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'give-board-my-listings.txt';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 /* ---- lookup modal ---- */
@@ -803,7 +920,13 @@ window.closeConfirm = closeConfirm;
 window.openLookupModal = openLookupModal;
 window.closeLookupModal = closeLookupModal;
 window.doLookup = doLookup;
+window.openMyListingsModal = openMyListingsModal;
+window.closeMyListingsModal = closeMyListingsModal;
+window.checkMyListing = checkMyListing;
+window.removeMyListingsEntry = removeMyListingsEntry;
+window.downloadMyListings = downloadMyListings;
 
+updateMyListingsBtn();
 subscribeItems();
 </script>
 </body>
