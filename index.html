@@ -304,6 +304,8 @@
       <h2 style="margin:0;font-size:1.3rem;">Posted to the board</h2>
       <p>This is your private reference code. It's the only way to check messages or remove this listing later — <strong>keep it somewhere safe, it can't be recovered if lost.</strong></p>
       <div class="ref-code" id="refCodeDisplay"></div>
+      <img id="refQrCode" alt="QR code for your reference code" style="display:block;margin:0 auto 4px;width:150px;height:150px;border:1px solid var(--line);border-radius:4px;background:#fff;">
+      <p style="font-size:0.8rem;">Scan to save the code, or screenshot this screen.</p>
       <p>The site never stores your email. Tap below to email yourself this reference from your own mail app.</p>
       <div class="confirm-actions">
         <a class="btn btn-ghost" id="emailRefLink" href="#" style="text-decoration:none;display:inline-block;">Email me this reference</a>
@@ -355,6 +357,7 @@ import {
   getFirestore, collection, doc, setDoc, addDoc, getDocs, updateDoc,
   onSnapshot, query, orderBy, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import { toDataURL as qrToDataURL } from "https://cdn.jsdelivr.net/npm/qrcode@1.5.4/+esm";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCEnWAqRLRMjcDNj-5_eI5KvjalSrlOf9A",
@@ -578,6 +581,15 @@ async function submitItem(){
     closePostModal();
 
     document.getElementById('refCodeDisplay').textContent = reference;
+    const qrImg = document.getElementById('refQrCode');
+    qrImg.removeAttribute('src');
+    try{
+      qrImg.src = await qrToDataURL(reference, {
+        width: 300, margin: 1, color: { dark: '#2C4A3E', light: '#FBF8F1' }
+      });
+    }catch(e){
+      console.error('Failed to generate QR code', e);
+    }
     const subject = encodeURIComponent('Your Give Board reference — ' + reference);
     const body = encodeURIComponent(
       `Hi,\n\nThis is a record of your Give Board listing.\n\nItem: ${title}\nReference: ${reference}\n\nKeep this reference private — it's the only way to view messages about this listing.`
