@@ -11,7 +11,7 @@
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#2C4A3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Work+Sans:wght@400;500;600&family=Bangers&display=swap" rel="stylesheet">
 <style>
   :root{
     --ink: #21322A;
@@ -63,6 +63,18 @@
     width:100%;height:auto;display:block;border-radius:6px;
     box-shadow:0 24px 48px -12px rgba(33,50,42,0.35), 0 8px 16px -8px rgba(33,50,42,0.2);
   }
+  .boots-caption{
+    text-align:center;font-family:'Bangers',cursive;font-weight:400;
+    font-size:clamp(1.1rem,4vw,1.5rem);letter-spacing:1px;line-height:1.4;
+    margin:14px 0 0;
+  }
+  .boots-caption span{
+    display:inline-block;-webkit-text-stroke:1px var(--ink);text-shadow:2px 2px 0 rgba(33,50,42,0.15);
+  }
+  .boots-caption span:nth-child(4n+1){color:var(--gold);transform:rotate(-4deg);}
+  .boots-caption span:nth-child(4n+2){color:#E0508A;transform:rotate(3deg);}
+  .boots-caption span:nth-child(4n+3){color:var(--clay);transform:rotate(-3deg);}
+  .boots-caption span:nth-child(4n+4){color:var(--forest);transform:rotate(4deg);}
   .privacy-note{
     display:flex;gap:10px;align-items:flex-start;background:var(--paper-warm);
     border:1px solid var(--line);border-radius:4px;padding:12px 16px;margin-top:18px;max-width:520px;
@@ -206,6 +218,10 @@
     </div>
     <div class="hero-image">
       <img src="boots.jpg" alt="Cartoon of boots going from unwanted and dusty to loved and shined">
+      <p class="boots-caption">
+        <span>Go</span> <span>on,</span> <span>give</span> <span>your</span>
+        <span>unwanted</span> <span>stuff</span> <span>a</span> <span>home!</span>
+      </p>
     </div>
   </div>
 </section>
