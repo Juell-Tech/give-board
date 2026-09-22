@@ -143,8 +143,11 @@
   .detail-body .desc{line-height:1.6;margin-bottom:24px;white-space:pre-wrap;}
   .take-btn{display:block;width:100%;padding:16px;font-size:1rem;font-weight:600;background:var(--clay);color:var(--paper);border:none;border-radius:3px;cursor:pointer;letter-spacing:.2px;}
   .take-btn:hover{background:#A6441F;}
-  .take-btn:disabled{background:var(--line);color:var(--muted);cursor:not-allowed;}
-  .take-btn:disabled:hover{background:var(--line);}
+  .demo-sign{
+    text-align:center;padding:16px;font-family:'Fraunces',serif;font-weight:700;
+    font-size:1.05rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--clay);
+    background:var(--paper-warm);border:2px dashed var(--clay);border-radius:4px;
+  }
 
   .claim-box{border:1px solid var(--line);border-radius:4px;padding:18px;background:var(--paper-warm);margin-top:6px;}
   .claim-box p{margin:0 0 12px;font-size:0.85rem;color:var(--muted);line-height:1.5;}
@@ -247,6 +250,7 @@
 
       <div id="claimPrompt">
         <button class="take-btn" id="claimBtn" onclick="showClaimBox()">I'll have it!</button>
+        <div class="demo-sign" id="demoSign" style="display:none;">Demo Only</div>
       </div>
 
       <div id="goneNotice" style="display:none;text-align:center;padding:14px;background:var(--paper-warm);border:1px solid var(--line);border-radius:4px;color:var(--forest-dark);font-weight:600;">
@@ -666,9 +670,9 @@ function openDetail(id){
   document.getElementById('claimPrompt').style.display = gone ? 'none' : 'block';
   document.getElementById('goneNotice').style.display = gone ? 'block' : 'none';
 
-  const claimBtn = document.getElementById('claimBtn');
-  claimBtn.disabled = !!it.isDemo;
-  claimBtn.textContent = it.isDemo ? 'Demo Only' : "I'll have it!";
+  const isDemo = !!it.isDemo;
+  document.getElementById('claimBtn').style.display = isDemo ? 'none' : 'block';
+  document.getElementById('demoSign').style.display = isDemo ? 'block' : 'none';
 
   document.getElementById('claimBox').style.display = 'none';
   document.getElementById('claimMessage').value = '';
