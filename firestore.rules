@@ -40,5 +40,36 @@ service cloud.firestore {
         allow delete: if isAdmin();
       }
     }
+
+    // Running total of items ever posted (only ever moves up by exactly 1 per write)
+    match /stats/{statId} {
+      allow read: if true;
+      allow create: if isAdmin()
+                    || (statId == 'totals'
+                        && request.resource.data.keys().hasOnly(['itemsPosted'])
+                        && request.resource.data.itemsPosted == 1);
+      allow update: if isAdmin()
+                    || (statId == 'totals'
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['itemsPosted'])
+                        && request.resource.data.itemsPosted == resource.data.itemsPosted + 1);
+      allow delete: if isAdmin();
+    }
+
+    // Admin-controlled feature toggles, readable publicly so the post flow knows current state
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // "New post" notifications for the admin panel — private, admin-only read
+    match /notifications/{notificationId} {
+      allow read, update, delete: if isAdmin();
+      allow create: if request.resource.data.keys().hasOnly(['title','reference','postedAt'])
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() > 0
+                    && request.resource.data.title.size() <= 200
+                    && request.resource.data.reference is string
+                    && request.resource.data.postedAt == request.time;
+    }
   }
 }

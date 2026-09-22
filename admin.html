@@ -80,6 +80,21 @@
 
   .empty{border:1.5px dashed var(--line);border-radius:4px;padding:50px 20px;text-align:center;color:var(--muted);}
 
+  .stats-row{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px;}
+  .stat-card{background:var(--paper-warm);border:1px solid var(--line);border-radius:4px;padding:16px 20px;min-width:170px;}
+  .stat-number{font-family:'Fraunces',serif;font-weight:700;font-size:2rem;color:var(--forest);line-height:1;}
+  .stat-label{font-size:0.8rem;color:var(--muted);margin-top:6px;}
+  .notify-toggle-card{background:var(--paper-warm);border:1px solid var(--line);border-radius:4px;padding:16px 20px;display:flex;align-items:center;flex:1;min-width:260px;}
+  .toggle-label{display:flex;align-items:center;gap:10px;font-size:0.9rem;cursor:pointer;}
+  .toggle-label input{width:18px;height:18px;cursor:pointer;flex-shrink:0;}
+
+  .notif-item{
+    display:flex;justify-content:space-between;align-items:center;gap:10px;
+    background:var(--paper-warm);border:1px solid var(--line);border-radius:4px;
+    padding:10px 14px;margin-bottom:8px;font-size:0.85rem;
+  }
+  .notif-item .notif-meta{color:var(--muted);font-size:0.78rem;margin-top:2px;}
+
   .confirm-inline{display:flex;gap:8px;align-items:center;}
   .confirm-inline span{font-size:0.78rem;color:var(--clay);font-weight:600;}
 </style>
@@ -106,6 +121,27 @@
   </div>
 
   <div id="adminSection" style="display:none;">
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-number" id="totalPostedCount">—</div>
+        <div class="stat-label">Items posted (all time)</div>
+      </div>
+      <div class="notify-toggle-card">
+        <label class="toggle-label">
+          <input type="checkbox" id="notifyToggle" onchange="toggleNotifySetting()">
+          Notify me in-app when someone posts a new item
+        </label>
+      </div>
+    </div>
+
+    <div id="notificationsSection" style="display:none;">
+      <div class="toolbar">
+        <h2 style="margin:0;font-size:1.1rem;">New post notifications</h2>
+        <button class="btn btn-ghost" id="clearNotifsBtn" onclick="clearAllNotifications()">Clear all</button>
+      </div>
+      <div id="notificationsList"></div>
+    </div>
+
     <div class="toolbar">
       <h1 style="margin:0;font-size:1.4rem;">All listings</h1>
       <span class="who" id="countLabel"></span>
@@ -120,7 +156,7 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import {
-  getFirestore, collection, doc, getDocs, deleteDoc, updateDoc, orderBy, query
+  getFirestore, collection, doc, getDoc, setDoc, getDocs, deleteDoc, updateDoc, orderBy, query, limit
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -162,6 +198,86 @@ async function doSignIn(){
 
 async function doSignOut(){
   await signOut(auth);
+}
+
+async function loadStats(){
+  try{
+    const snap = await getDoc(doc(db, 'stats', 'totals'));
+    document.getElementById('totalPostedCount').textContent = snap.exists() ? (snap.data().itemsPosted || 0) : 0;
+  }catch(e){
+    console.error('Failed to load stats', e);
+    document.getElementById('totalPostedCount').textContent = '—';
+  }
+}
+
+async function loadNotifySetting(){
+  try{
+    const snap = await getDoc(doc(db, 'settings', 'notifications'));
+    document.getElementById('notifyToggle').checked = snap.exists() && !!snap.data().enabled;
+  }catch(e){
+    console.error('Failed to load notification setting', e);
+  }
+}
+
+async function toggleNotifySetting(){
+  const checked = document.getElementById('notifyToggle').checked;
+  try{
+    await setDoc(doc(db, 'settings', 'notifications'), { enabled: checked }, { merge: true });
+  }catch(e){
+    console.error('Failed to update notification setting', e);
+  }
+  if(checked) loadNotifications();
+}
+
+async function loadNotifications(){
+  const section = document.getElementById('notificationsSection');
+  const list = document.getElementById('notificationsList');
+  try{
+    const snap = await getDocs(query(collection(db, 'notifications'), orderBy('postedAt', 'desc'), limit(50)));
+    if(snap.empty){
+      section.style.display = 'none';
+      return;
+    }
+    section.style.display = 'block';
+    list.innerHTML = snap.docs.map(d => {
+      const n = d.data();
+      const when = n.postedAt ? n.postedAt.toDate().toLocaleString(undefined, {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'}) : 'just now';
+      return `
+        <div class="notif-item">
+          <div>
+            <div>New listing: <strong>${escapeHtml(n.title)}</strong></div>
+            <div class="notif-meta">${escapeHtml(n.reference)} · ${when}</div>
+          </div>
+          <button class="btn btn-ghost" onclick="window.__adminDismissNotification('${d.id}')">Dismiss</button>
+        </div>`;
+    }).join('');
+  }catch(e){
+    console.error('Failed to load notifications', e);
+    section.style.display = 'none';
+  }
+}
+
+async function dismissNotification(notifId){
+  try{
+    await deleteDoc(doc(db, 'notifications', notifId));
+    loadNotifications();
+  }catch(e){
+    console.error('Failed to dismiss notification', e);
+  }
+}
+
+async function clearAllNotifications(){
+  const btn = document.getElementById('clearNotifsBtn');
+  btn.disabled = true;
+  try{
+    const snap = await getDocs(collection(db, 'notifications'));
+    await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
+    await loadNotifications();
+  }catch(e){
+    console.error('Failed to clear notifications', e);
+  }finally{
+    btn.disabled = false;
+  }
 }
 
 async function loadAllListings(){
@@ -261,6 +377,9 @@ onAuthStateChanged(auth, user => {
     headerActions.innerHTML = `<button class="btn btn-ghost" onclick="window.__adminSignOut()">Sign out</button>`;
     confirmingDeleteId = null;
     loadAllListings();
+    loadStats();
+    loadNotifySetting();
+    loadNotifications();
   }else{
     loginSection.style.display = 'block';
     adminSection.style.display = 'none';
@@ -274,6 +393,9 @@ window.__adminToggleHidden = toggleHidden;
 window.__adminStartDelete = startDelete;
 window.__adminCancelDelete = cancelDelete;
 window.__adminConfirmDelete = confirmDelete;
+window.toggleNotifySetting = toggleNotifySetting;
+window.clearAllNotifications = clearAllNotifications;
+window.__adminDismissNotification = dismissNotification;
 </script>
 </body>
 </html>

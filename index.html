@@ -386,7 +386,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
 import {
-  getFirestore, collection, doc, setDoc, addDoc, getDocs, updateDoc,
+  getFirestore, collection, doc, setDoc, addDoc, getDocs, getDoc, updateDoc, increment,
   onSnapshot, query, orderBy, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 import { toDataURL as qrToDataURL } from "https://cdn.jsdelivr.net/npm/qrcode@1.5.4/+esm";
@@ -608,6 +608,20 @@ async function submitItem(){
       title, condition, description: desc,
       image: pendingImage, reference, postedAt: serverTimestamp()
     });
+
+    try{
+      await setDoc(doc(db, 'stats', 'totals'), { itemsPosted: increment(1) }, { merge: true });
+    }catch(e){
+      console.error('Failed to update posted-items counter', e);
+    }
+    try{
+      const notifySettings = await getDoc(doc(db, 'settings', 'notifications'));
+      if(notifySettings.exists() && notifySettings.data().enabled){
+        await addDoc(collection(db, 'notifications'), { title, reference, postedAt: serverTimestamp() });
+      }
+    }catch(e){
+      console.error('Failed to create admin notification', e);
+    }
 
     saveMyListingsEntry({ title, reference, postedAt: Date.now() });
     closePostModal();
