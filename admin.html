@@ -130,6 +130,10 @@
   <div id="adminSection" style="display:none;">
     <div class="stats-row">
       <div class="stat-card">
+        <div class="stat-number" id="liveItemsCount">—</div>
+        <div class="stat-label">Items on board now</div>
+      </div>
+      <div class="stat-card">
         <div class="stat-number" id="totalPostedCount">—</div>
         <div class="stat-label">Items posted (all time)</div>
       </div>
@@ -341,6 +345,7 @@ async function loadAllListings(){
   const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
   countLabel.textContent = items.length === 1 ? '1 listing' : items.length + ' listings';
+  document.getElementById('liveItemsCount').textContent = items.filter(it => !it.hidden).length;
 
   if(items.length === 0){
     listWrap.innerHTML = `<div class="empty">No listings yet.</div>`;
