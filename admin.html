@@ -88,6 +88,13 @@
   .toggle-label{display:flex;align-items:center;gap:10px;font-size:0.9rem;cursor:pointer;}
   .toggle-label input{width:18px;height:18px;cursor:pointer;flex-shrink:0;}
 
+  .chart-card{background:var(--paper-warm);border:1px solid var(--line);border-radius:4px;padding:16px 20px;margin-bottom:24px;}
+  .bar-chart{display:flex;align-items:flex-end;gap:10px;height:110px;margin-top:12px;overflow-x:auto;}
+  .bar-col{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;flex:1;min-width:28px;height:100%;}
+  .bar-col .bar-count{font-size:0.68rem;color:var(--muted);margin-bottom:3px;}
+  .bar-col .bar{width:100%;max-width:26px;background:var(--forest);border-radius:2px 2px 0 0;min-height:3px;}
+  .bar-col .bar-label{font-size:0.68rem;color:var(--muted);margin-top:5px;}
+
   .notif-item{
     display:flex;justify-content:space-between;align-items:center;gap:10px;
     background:var(--paper-warm);border:1px solid var(--line);border-radius:4px;
@@ -126,12 +133,21 @@
         <div class="stat-number" id="totalPostedCount">—</div>
         <div class="stat-label">Items posted (all time)</div>
       </div>
+      <div class="stat-card">
+        <div class="stat-number" id="totalVisitsCount">—</div>
+        <div class="stat-label">Site visits (all time)</div>
+      </div>
       <div class="notify-toggle-card">
         <label class="toggle-label">
           <input type="checkbox" id="notifyToggle" onchange="toggleNotifySetting()">
           Notify me in-app when someone posts a new item
         </label>
       </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="stat-label">Visits by month</div>
+      <div class="bar-chart" id="visitsChart"></div>
     </div>
 
     <div id="notificationsSection" style="display:none;">
@@ -207,6 +223,42 @@ async function loadStats(){
   }catch(e){
     console.error('Failed to load stats', e);
     document.getElementById('totalPostedCount').textContent = '—';
+  }
+}
+
+async function loadVisitsChart(){
+  const chartEl = document.getElementById('visitsChart');
+  const totalEl = document.getElementById('totalVisitsCount');
+  try{
+    const snap = await getDocs(collection(db, 'visits'));
+    const months = snap.docs
+      .map(d => ({ id: d.id, count: d.data().count || 0 }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+    const total = months.reduce((sum, m) => sum + m.count, 0);
+    totalEl.textContent = total;
+
+    if(months.length === 0){
+      chartEl.innerHTML = `<p style="color:var(--muted);font-size:0.85rem;margin:0;">No visits recorded yet.</p>`;
+      return;
+    }
+
+    const recent = months.slice(-12);
+    const max = Math.max(...recent.map(m => m.count), 1);
+    chartEl.innerHTML = recent.map(m => {
+      const [y, mo] = m.id.split('-');
+      const label = new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString(undefined, {month:'short'});
+      const heightPct = Math.max(4, Math.round((m.count / max) * 100));
+      return `
+        <div class="bar-col" title="${m.id}: ${m.count} visit${m.count === 1 ? '' : 's'}">
+          <div class="bar-count">${m.count}</div>
+          <div class="bar" style="height:${heightPct}%;"></div>
+          <div class="bar-label">${label}</div>
+        </div>`;
+    }).join('');
+  }catch(e){
+    console.error('Failed to load visits chart', e);
+    totalEl.textContent = '—';
+    chartEl.innerHTML = `<p style="color:var(--muted);font-size:0.85rem;margin:0;">Couldn't load visit data.</p>`;
   }
 }
 
@@ -378,6 +430,7 @@ onAuthStateChanged(auth, user => {
     confirmingDeleteId = null;
     loadAllListings();
     loadStats();
+    loadVisitsChart();
     loadNotifySetting();
     loadNotifications();
   }else{

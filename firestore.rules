@@ -71,5 +71,18 @@ service cloud.firestore {
                     && request.resource.data.reference is string
                     && request.resource.data.postedAt == request.time;
     }
+
+    // Site visit tally, one doc per calendar month (e.g. "2026-09") — private, admin-only read
+    match /visits/{monthId} {
+      allow read: if isAdmin();
+      allow create: if monthId.matches('^[0-9]{4}-(0[1-9]|1[0-2])$')
+                    && request.resource.data.keys().hasOnly(['count'])
+                    && request.resource.data.count == 1;
+      allow update: if isAdmin()
+                    || (monthId.matches('^[0-9]{4}-(0[1-9]|1[0-2])$')
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['count'])
+                        && request.resource.data.count == resource.data.count + 1);
+      allow delete: if isAdmin();
+    }
   }
 }

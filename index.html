@@ -724,6 +724,19 @@ async function sendClaimMessage(){
   }
 }
 
+/* ---- visit tally ---- */
+async function recordVisit(){
+  try{
+    if(sessionStorage.getItem('gb-visit-recorded')) return;
+    sessionStorage.setItem('gb-visit-recorded', '1');
+    const now = new Date();
+    const monthId = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    await setDoc(doc(db, 'visits', monthId), { count: increment(1) }, { merge: true });
+  }catch(e){
+    console.error('Failed to record visit', e);
+  }
+}
+
 /* ---- my listings (saved locally on this device) ---- */
 const MY_LISTINGS_KEY = 'give-board-my-listings';
 
@@ -991,6 +1004,7 @@ window.downloadMyListings = downloadMyListings;
 
 updateMyListingsBtn();
 subscribeItems();
+recordVisit();
 </script>
 </body>
 </html>
