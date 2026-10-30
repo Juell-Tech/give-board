@@ -338,7 +338,7 @@
 
       <label>Your email</label>
       <input type="email" id="ownerEmail" placeholder="you@example.com">
-      <div class="field-note">Only used to open your own mail app so you can send yourself the reference code. It's never saved or shown on the site.</div>
+      <div class="field-note">Kept privately and never shown to anyone. It's used only to help you get back into this listing if you lose your code or editing access. Ask us any time and we'll delete it.</div>
       <div class="err" id="formErr">Please fill in a title, details, and a valid email.</div>
 
       <div class="privacy-note warn" style="margin-top:20px;">
@@ -364,11 +364,27 @@
       <div class="ref-code" id="refCodeDisplay"></div>
       <img id="refQrCode" alt="QR code for your reference code" style="display:block;margin:0 auto 4px;width:150px;height:150px;border:1px solid var(--line);border-radius:4px;background:#fff;">
       <p style="font-size:0.8rem;">Scan to save the code, or screenshot this screen.</p>
-      <p>The site never stores your email. Tap below to email yourself this reference from your own mail app.</p>
+      <p>Your email is kept privately so we can help if you lose access. You can also tap below to email yourself this reference from your own mail app.</p>
       <div class="confirm-actions">
         <a class="btn btn-ghost" id="emailRefLink" href="#" style="text-decoration:none;display:inline-block;">Email me this reference</a>
         <button class="btn btn-primary" onclick="closeConfirm()">Done</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- RECOVERY MODAL (opened from the link the admin emails) -->
+<div class="overlay" id="recoverOverlay">
+  <div class="modal" style="max-width:440px;">
+    <button class="modal-close" onclick="closeRecover()">&times;</button>
+    <div class="confirm-body">
+      <h2 style="margin:0 0 6px;font-size:1.3rem;">Restore your listing access</h2>
+      <p id="recoverIntro"></p>
+      <div class="form-actions">
+        <button class="btn btn-primary" id="recoverBtn" style="width:100%;padding:12px;" onclick="claimRecovery()">Restore access on this browser</button>
+      </div>
+      <div class="err" id="recoverErr" style="text-align:center;"></div>
+      <p id="recoverDone" style="display:none;color:var(--forest);font-weight:600;"></p>
     </div>
   </div>
 </div>
@@ -741,6 +757,7 @@ async function submitItem(){
 
     const batch = writeBatch(db);
     batch.set(itemRef, itemData);
+    batch.set(doc(db, 'ownerContacts', itemRef.id), { email });
     pendingPhotos.forEach((data, i) => {
       batch.set(doc(db, 'items', itemRef.id, 'photos', PHOTO_IDS[i]), { data });
     });
@@ -900,6 +917,70 @@ async function sendClaimMessage(){
   }finally{
     sendBtn.disabled = false;
     sendBtn.textContent = 'Send message';
+  }
+}
+
+/* ---- recovery link (admin emails the poster a link; opening it moves editing rights to this browser) ---- */
+let recoverItemId = null;
+let recoverToken = null;
+
+function closeRecover(){
+  document.getElementById('recoverOverlay').classList.remove('open');
+  history.replaceState(null, '', location.pathname);
+}
+
+async function handleRecoveryLink(){
+  const param = new URLSearchParams(location.search).get('recover');
+  if(!param || !param.includes('.')) return;
+  const dot = param.indexOf('.');
+  recoverItemId = param.slice(0, dot);
+  recoverToken = param.slice(dot + 1);
+  if(!recoverItemId || !recoverToken) return;
+
+  const intro = document.getElementById('recoverIntro');
+  try{
+    const snap = await getDoc(doc(db, 'items', recoverItemId));
+    if(!snap.exists()) throw new Error('missing');
+    intro.textContent = 'This will let you edit the photos of "' + snap.data().title + '" from this browser. It moves editing from any other browser to this one.';
+  }catch(e){
+    intro.textContent = "We couldn't find that listing. The link may be wrong or the listing may have been removed.";
+    document.getElementById('recoverBtn').style.display = 'none';
+  }
+  document.getElementById('recoverOverlay').classList.add('open');
+}
+
+async function claimRecovery(){
+  const btn = document.getElementById('recoverBtn');
+  const err = document.getElementById('recoverErr');
+  err.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Restoring…';
+  try{
+    const uid = await ensureOwnerUid();
+    if(!uid) throw new Error('no-auth');
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'recovery', recoverItemId), { claimToken: recoverToken, claimedBy: uid });
+    batch.update(doc(db, 'items', recoverItemId), { ownerUid: uid });
+    await batch.commit();
+
+    const snap = await getDoc(doc(db, 'items', recoverItemId));
+    if(snap.exists()){
+      const d = snap.data();
+      if(!getMyListings().some(e => e.reference === d.reference)){
+        saveMyListingsEntry({ title: d.title, reference: d.reference, postedAt: Date.now() });
+      }
+    }
+    btn.style.display = 'none';
+    const done = document.getElementById('recoverDone');
+    done.textContent = 'Done. Open "Check your listing" and enter your reference code to edit your photos.';
+    done.style.display = 'block';
+    history.replaceState(null, '', location.pathname);
+  }catch(e){
+    console.error('Recovery failed', e);
+    err.textContent = 'This link has expired, was already used, or isn\'t valid. Ask support for a new one.';
+    err.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Restore access on this browser';
   }
 }
 
@@ -1307,6 +1388,8 @@ document.querySelectorAll('.overlay').forEach(ov => {
 window.openPostModal = openPostModal;
 window.closePostModal = closePostModal;
 window.loadMoreItems = loadMoreItems;
+window.closeRecover = closeRecover;
+window.claimRecovery = claimRecovery;
 window.removePendingPhoto = removePendingPhoto;
 window.setMainPendingPhoto = setMainPendingPhoto;
 window.editMakeMain = editMakeMain;
@@ -1336,6 +1419,7 @@ window.downloadMyListings = downloadMyListings;
 updateMyListingsBtn();
 subscribeItems();
 recordVisit();
+handleRecoveryLink();
 </script>
 </body>
 </html>

@@ -125,6 +125,8 @@
     <input type="password" id="adminPassword" autocomplete="current-password">
     <button class="btn btn-primary" id="signInBtn" onclick="doSignIn()">Sign in</button>
     <div class="err" id="loginErr">Sign-in failed. Check your email and password.</div>
+    <p style="margin-top:14px;font-size:.85rem;text-align:center;"><a href="#" onclick="doResetPassword();return false;" style="color:var(--forest);font-weight:600;">Forgot password? Email me a reset link</a></p>
+    <div class="err" id="resetMsg" style="color:var(--forest);"></div>
   </div>
 
   <div id="adminSection" style="display:none;">
@@ -173,10 +175,11 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
 import {
-  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import {
-  getFirestore, collection, doc, getDoc, setDoc, getDocs, deleteDoc, updateDoc, orderBy, query, limit
+  getFirestore, collection, doc, getDoc, setDoc, getDocs, deleteDoc, updateDoc, orderBy, query, limit,
+  Timestamp, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -195,7 +198,10 @@ function escapeHtml(s){
   return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+const ADMIN_EMAIL = 'junior@juelltech.com';
 let confirmingDeleteId = null;
+let rowsById = {};
+let recoveryNote = {}; // itemId -> message shown after a recovery link was made
 
 async function doSignIn(){
   const email = document.getElementById('adminEmail').value.trim();
@@ -209,11 +215,27 @@ async function doSignIn(){
     await signInWithEmailAndPassword(auth, email, password);
   }catch(e){
     console.error('Sign-in failed', e);
+    err.textContent = 'Sign-in failed (' + (e.code || 'unknown error') + '). Check your email and password, or use the reset link below.';
     err.style.display = 'block';
   }finally{
     btn.disabled = false;
     btn.textContent = 'Sign in';
   }
+}
+
+async function doResetPassword(){
+  const email = document.getElementById('adminEmail').value.trim() || ADMIN_EMAIL;
+  const msg = document.getElementById('resetMsg');
+  msg.style.color = 'var(--forest)';
+  try{
+    await sendPasswordResetEmail(auth, email);
+    msg.textContent = 'If ' + email + ' is the admin account, a reset link is on its way. Check the inbox and spam folder.';
+  }catch(e){
+    console.error('Password reset failed', e);
+    msg.style.color = 'var(--clay)';
+    msg.textContent = 'Could not send the reset email (' + (e.code || 'unknown error') + ').';
+  }
+  msg.style.display = 'block';
 }
 
 async function doSignOut(){
@@ -352,10 +374,24 @@ async function loadAllListings(){
     return;
   }
 
+  const contacts = {};
+  let contactsFailed = false;
+  try{
+    const contactsSnap = await getDocs(collection(db, 'ownerContacts'));
+    contactsSnap.docs.forEach(d => { contacts[d.id] = d.data().email; });
+  }catch(e){
+    console.error('Failed to load poster emails', e);
+    contactsFailed = true;
+  }
+
   const rows = await Promise.all(items.map(async it => {
     const msgsSnap = await getDocs(collection(db, 'items', it.id, 'messages'));
-    return { ...it, msgCount: msgsSnap.size };
+    return { ...it, msgCount: msgsSnap.size, email: contacts[it.id] || null };
   }));
+  rowsById = Object.fromEntries(rows.map(r => [r.id, r]));
+  if(contactsFailed){
+    countLabel.textContent += ' · could not read poster emails (check you are signed in as the admin)';
+  }
 
   renderRows(rows);
 }
@@ -377,6 +413,10 @@ function renderRows(rows){
             <span class="ref-code">${escapeHtml(it.reference)}</span>
           </div>
           <div class="desc">${escapeHtml(it.description)}</div>
+          <div class="meta" style="margin-bottom:8px;">${it.email
+            ? 'Poster email (private): <strong>' + escapeHtml(it.email) + '</strong>'
+            : 'No poster email on file (posted before emails were kept)'}</div>
+          ${recoveryNote[it.id] ? `<div class="meta" style="color:var(--forest);font-weight:600;margin-bottom:8px;">${escapeHtml(recoveryNote[it.id])}</div>` : ''}
           <span class="status-badge ${hidden ? 'status-hidden' : 'status-live'}">${hidden ? 'Hidden' : 'Live on board'}</span>
         </div>
         <div class="row-actions">
@@ -387,12 +427,50 @@ function renderRows(rows){
               <button class="btn btn-danger" onclick="window.__adminConfirmDelete('${it.id}')">Confirm</button>
             </div>
           ` : `
+            <button class="btn btn-ghost" ${it.email ? '' : 'disabled title="No email on file for this listing"'} onclick="window.__adminSendRecovery('${it.id}')">Send recovery link</button>
             <button class="btn btn-ghost" onclick="window.__adminToggleHidden('${it.id}', ${hidden})">${hidden ? 'Unhide' : 'Hide'}</button>
             <button class="btn btn-danger" onclick="window.__adminStartDelete('${it.id}')">Delete permanently</button>
           `}
         </div>
       </div>`;
   }).join('') + `</div>`;
+}
+
+function makeToken(){
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function sendRecovery(itemId){
+  const row = rowsById[itemId];
+  if(!row || !row.email) return;
+  try{
+    const token = makeToken();
+    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    // setDoc replaces any earlier token, so a new link always supersedes an old one
+    await setDoc(doc(db, 'recovery', itemId), {
+      token, expiresAt: Timestamp.fromDate(expires), createdAt: serverTimestamp()
+    });
+
+    const link = location.origin + '/?recover=' + encodeURIComponent(itemId) + '.' + token;
+    const subject = encodeURIComponent('Your Give Board listing: ' + row.title);
+    const body = encodeURIComponent(
+      'Hi,\n\nYou asked us for help getting back into your Give Board listing "' + row.title + '".\n\n' +
+      'Your reference code (for messages and removing the listing): ' + row.reference + '\n\n' +
+      'To edit the photos from the device you\'re on now, open this link on that device and tap "Restore access". ' +
+      'It works once and expires in 7 days:\n' + link + '\n\n' +
+      'If you didn\'t ask for this, you can ignore this email.\n\nThe Give Board'
+    );
+    try{ await navigator.clipboard.writeText(link); }catch(e){ /* clipboard is a convenience only */ }
+    recoveryNote[itemId] = 'Recovery link created (valid 7 days) and copied to your clipboard. Your email app should open addressed to the poster.';
+    renderRows(Object.values(rowsById));
+    window.location.href = 'mailto:' + encodeURIComponent(row.email) + '?subject=' + subject + '&body=' + body;
+  }catch(e){
+    console.error('Failed to create recovery link', e);
+    recoveryNote[itemId] = 'Could not create the recovery link. Check you are signed in and the rules are published.';
+    renderRows(Object.values(rowsById));
+  }
 }
 
 async function toggleHidden(itemId, currentlyHidden){
@@ -418,6 +496,8 @@ async function confirmDelete(itemId){
     await Promise.all(msgsSnap.docs.map(m => deleteDoc(m.ref)));
     const photosSnap = await getDocs(collection(db, 'items', itemId, 'photos'));
     await Promise.all(photosSnap.docs.map(ph => deleteDoc(ph.ref)));
+    await deleteDoc(doc(db, 'ownerContacts', itemId));
+    await deleteDoc(doc(db, 'recovery', itemId));
     await deleteDoc(doc(db, 'items', itemId));
     confirmingDeleteId = null;
     await loadAllListings();
@@ -430,6 +510,18 @@ onAuthStateChanged(auth, user => {
   const loginSection = document.getElementById('loginSection');
   const adminSection = document.getElementById('adminSection');
   const headerActions = document.getElementById('headerActions');
+  // The site also signs visitors in anonymously (to give posters edit rights), so a signed-in
+  // user is not necessarily the admin.
+  if(user && (user.email || '').toLowerCase() !== ADMIN_EMAIL){
+    signOut(auth);
+    // An anonymous session is expected here; only explain a real account that isn't the admin.
+    if(!user.isAnonymous){
+      const err = document.getElementById('loginErr');
+      err.textContent = 'Signed in as ' + user.email + ', which is not the admin account (' + ADMIN_EMAIL + ').';
+      err.style.display = 'block';
+    }
+    return;
+  }
   if(user){
     loginSection.style.display = 'none';
     adminSection.style.display = 'block';
@@ -448,8 +540,10 @@ onAuthStateChanged(auth, user => {
 });
 
 window.doSignIn = doSignIn;
+window.doResetPassword = doResetPassword;
 window.__adminSignOut = doSignOut;
 window.__adminToggleHidden = toggleHidden;
+window.__adminSendRecovery = sendRecovery;
 window.__adminStartDelete = startDelete;
 window.__adminCancelDelete = cancelDelete;
 window.__adminConfirmDelete = confirmDelete;

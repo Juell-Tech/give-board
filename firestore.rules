@@ -33,6 +33,10 @@ service cloud.firestore {
       return /databases/$(database)/documents/items/$(itemId);
     }
 
+    function recoveryPath(itemId){
+      return /databases/$(database)/documents/recovery/$(itemId);
+    }
+
     function isItemOwner(itemId){
       return request.auth != null
           && exists(itemPath(itemId))
@@ -68,7 +72,17 @@ service cloud.firestore {
                         && request.resource.data.photoCount >= 1
                         && request.resource.data.photoCount <= 4
                         && request.resource.data.thumb is string
-                        && request.resource.data.thumb.size() <= 150000);
+                        && request.resource.data.thumb.size() <= 150000)
+                    // Taking over ownership with an unexpired, unused admin-issued recovery token,
+                    // claimed in the same batch as this update
+                    || (request.auth != null
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ownerUid'])
+                        && request.resource.data.ownerUid == request.auth.uid
+                        && exists(recoveryPath(itemId))
+                        && get(recoveryPath(itemId)).data.get('claimedBy', null) == null
+                        && get(recoveryPath(itemId)).data.expiresAt > request.time
+                        && getAfter(recoveryPath(itemId)).data.claimedBy == request.auth.uid
+                        && getAfter(recoveryPath(itemId)).data.claimToken == get(recoveryPath(itemId)).data.token);
       allow delete: if isAdmin();
 
       // Up to four full-size photos per listing, in fixed slots p1-p4 (so a listing can never hold more)
@@ -126,6 +140,31 @@ service cloud.firestore {
                     && request.resource.data.title.size() <= 200
                     && request.resource.data.reference is string
                     && request.resource.data.postedAt == request.time;
+    }
+
+    // Poster's email, kept privately so the admin can help them regain access.
+    // Only creatable together with the listing itself; only the admin can read or change it.
+    match /ownerContacts/{itemId} {
+      allow read, update, delete: if isAdmin();
+      allow create: if isNewItemInThisWrite(itemId)
+                    && request.resource.data.keys().hasOnly(['email'])
+                    && request.resource.data.email is string
+                    && request.resource.data.email.size() > 5
+                    && request.resource.data.email.size() <= 254
+                    && request.resource.data.email.matches('^[^@ ]+@[^@ ]+[.][^@ ]+$');
+    }
+
+    // One-time recovery tokens issued by the admin. Only the admin can read them; a poster can
+    // use one exactly once, before it expires, by presenting the matching token.
+    match /recovery/{itemId} {
+      allow read, create, delete: if isAdmin();
+      allow update: if isAdmin()
+                    || (request.auth != null
+                        && resource.data.get('claimedBy', null) == null
+                        && resource.data.expiresAt > request.time
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['claimToken','claimedBy'])
+                        && request.resource.data.claimedBy == request.auth.uid
+                        && request.resource.data.claimToken == resource.data.token);
     }
 
     // Site visit tally, one doc per calendar month (e.g. "2026-09") — private, admin-only read
