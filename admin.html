@@ -102,6 +102,19 @@
   }
   .notif-item .notif-meta{color:var(--muted);font-size:0.78rem;margin-top:2px;}
 
+  .overlay{display:none;position:fixed;inset:0;background:rgba(27,49,41,0.55);align-items:center;justify-content:center;padding:16px;z-index:50;}
+  .overlay.open{display:flex;}
+  .pm-modal{background:var(--paper);border-radius:6px;max-width:480px;width:100%;max-height:90vh;overflow:auto;padding:22px;position:relative;}
+  .pm-modal h2{margin:0 30px 14px 0;font-size:1.15rem;}
+  .pm-close{position:absolute;top:10px;right:12px;border:none;background:none;font-size:1.6rem;line-height:1;cursor:pointer;color:var(--muted);}
+  .pm-row{display:flex;gap:12px;align-items:center;background:var(--paper-warm);border:1px solid var(--line);border-radius:4px;padding:10px;margin-bottom:10px;flex-wrap:wrap;}
+  .pm-row img{width:72px;height:72px;object-fit:contain;background:#eee;border:1px solid var(--line);border-radius:3px;flex-shrink:0;}
+  .pm-label{flex:1;min-width:80px;font-size:0.88rem;font-weight:600;}
+  .pm-btns{display:flex;gap:6px;flex-wrap:wrap;}
+  .pm-btns .btn{padding:6px 10px;font-size:0.8rem;}
+  .pm-msg{font-size:0.85rem;font-weight:600;color:var(--forest);margin:10px 0 0;text-align:center;}
+  .pm-msg.err{color:var(--clay);}
+
   .confirm-inline{display:flex;gap:8px;align-items:center;}
   .confirm-inline span{font-size:0.78rem;color:var(--clay);font-weight:600;}
 </style>
@@ -175,6 +188,15 @@
     <div id="listWrap"></div>
   </div>
 </main>
+
+<div class="overlay" id="photoModal">
+  <div class="pm-modal">
+    <button class="pm-close" onclick="closePhotoManager()" aria-label="Close">&times;</button>
+    <h2 id="pmTitle"></h2>
+    <div id="pmBody"></div>
+    <input type="file" id="adminPhotoInput" accept="image/*" style="display:none">
+  </div>
+</div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
@@ -459,6 +481,136 @@ async function shrinkOlderPhoto(original){
   return { photo, thumb };
 }
 
+/* ---- photo manager: the admin can add, remove and choose the main photo of any listing ---- */
+const ADMIN_PHOTO_IDS = ['p1', 'p2', 'p3', 'p4'];
+let photoModalId = null;
+let photoModalPhotos = [];
+let photoModalBusy = false;
+
+function olderFormat(it){
+  return !!(it.image && !it.thumb);
+}
+
+function readFileAsDataUrl(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function thumbFromPhoto(dataUrl){
+  const img = await loadImg(dataUrl);
+  return drawScaled(img, OPT_THUMB_DIM).toDataURL('image/jpeg', 0.6);
+}
+
+async function openPhotoManager(itemId){
+  photoModalId = itemId;
+  document.getElementById('pmTitle').textContent = rowsById[itemId].title;
+  document.getElementById('photoModal').classList.add('open');
+  await refreshPhotoManager();
+}
+
+function closePhotoManager(){
+  document.getElementById('photoModal').classList.remove('open');
+  photoModalId = null;
+}
+
+async function refreshPhotoManager(message, isError){
+  const body = document.getElementById('pmBody');
+  const it = rowsById[photoModalId];
+  if(!it) return;
+  body.innerHTML = `<p style="color:var(--muted);">Loading photos…</p>`;
+  try{
+    const snap = await getDocs(collection(db, 'items', photoModalId, 'photos'));
+    photoModalPhotos = snap.docs.map(d => ({ id: d.id, data: d.data().data })).sort((a, b) => a.id.localeCompare(b.id));
+  }catch(e){
+    console.error('Failed to load photos', e);
+    body.innerHTML = `<p class="pm-msg err">Could not load the photos.</p>`;
+    return;
+  }
+  const rows = photoModalPhotos.map((p, i) => {
+    const isMain = p.id === it.mainPhoto;
+    return `
+      <div class="pm-row">
+        <img src="${p.data}" alt="Photo ${i + 1}">
+        <div class="pm-label">${isMain ? 'Main photo' : 'Photo ' + (i + 1)}</div>
+        <div class="pm-btns">
+          ${isMain ? '' : `<button class="btn btn-ghost" onclick="window.__pmMakeMain('${p.id}')">Make main</button>`}
+          ${photoModalPhotos.length > 1 ? `<button class="btn btn-danger" onclick="window.__pmRemove('${p.id}')">Remove</button>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+  const full = photoModalPhotos.length >= ADMIN_PHOTO_IDS.length;
+  body.innerHTML = rows +
+    `<button class="btn btn-ghost" style="width:100%;" ${full ? 'disabled' : ''} onclick="document.getElementById('adminPhotoInput').click()">${full ? 'Already has 4 photos' : 'Add a photo'}</button>` +
+    (message ? `<p class="pm-msg${isError ? ' err' : ''}">${escapeHtml(message)}</p>` : '');
+}
+
+// Runs one change, then refreshes the listings behind the modal and the modal itself
+async function runPhotoChange(change, doneMessage){
+  if(photoModalBusy || !photoModalId) return;
+  photoModalBusy = true;
+  try{
+    await change();
+    await loadAllListings();
+    await refreshPhotoManager(doneMessage);
+  }catch(e){
+    console.error('Photo change failed', e);
+    await refreshPhotoManager('Something went wrong. Please try again.', true);
+  }finally{
+    photoModalBusy = false;
+  }
+}
+
+function makeMainPhoto(photoId){
+  runPhotoChange(async () => {
+    const photo = photoModalPhotos.find(p => p.id === photoId);
+    const thumb = await thumbFromPhoto(photo.data);
+    await updateDoc(doc(db, 'items', photoModalId), { mainPhoto: photoId, thumb });
+  }, 'Main photo changed.');
+}
+
+function removePhoto(photoId){
+  if(!confirm('Remove this photo from the listing?')) return;
+  runPhotoChange(async () => {
+    const remaining = photoModalPhotos.filter(p => p.id !== photoId);
+    if(!remaining.length) throw new Error('A listing needs at least one photo');
+    const updates = { photoCount: remaining.length };
+    if(photoId === rowsById[photoModalId].mainPhoto){
+      updates.mainPhoto = remaining[0].id;
+      updates.thumb = await thumbFromPhoto(remaining[0].data);
+    }
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'items', photoModalId, 'photos', photoId));
+    batch.update(doc(db, 'items', photoModalId), updates);
+    await batch.commit();
+  }, 'Photo removed.');
+}
+
+document.getElementById('adminPhotoInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  runPhotoChange(async () => {
+    const img = await loadImg(await readFileAsDataUrl(file));
+    const canvas = drawScaled(img, OPT_MAX_DIM); // resize only, never crop
+    let photo = '';
+    for(const quality of [0.72, 0.62, 0.52, 0.42, 0.32]){
+      photo = canvas.toDataURL('image/jpeg', quality);
+      if(photo.length <= OPT_TARGET_CHARS) break;
+    }
+    if(photo.length > 700000) throw new Error('Photo still too large after compression');
+    const freeId = ADMIN_PHOTO_IDS.find(id => !photoModalPhotos.some(p => p.id === id));
+    if(!freeId) throw new Error('No free photo slot');
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'items', photoModalId, 'photos', freeId), { data: photo });
+    batch.update(doc(db, 'items', photoModalId), { photoCount: photoModalPhotos.length + 1 });
+    await batch.commit();
+  }, 'Photo added.');
+});
+
 async function optimiseOlderPhotos(){
   const old = olderListings();
   if(!old.length) return;
@@ -510,6 +662,7 @@ function renderRows(rows){
           <div class="meta" style="margin-bottom:8px;">${it.email
             ? 'Poster email (private): <strong>' + escapeHtml(it.email) + '</strong>'
             : 'No poster email on file (posted before emails were kept)'}</div>
+          <div class="meta" style="margin-bottom:8px;">Photos: ${it.image && !it.thumb ? '1 (older format)' : (it.photoCount || 1)} of 4</div>
           ${recoveryNote[it.id] ? `<div class="meta" style="color:var(--forest);font-weight:600;margin-bottom:8px;">${escapeHtml(recoveryNote[it.id])}</div>` : ''}
           <span class="status-badge ${hidden ? 'status-hidden' : 'status-live'}">${hidden ? 'Hidden' : 'Live on board'}</span>
         </div>
@@ -521,6 +674,7 @@ function renderRows(rows){
               <button class="btn btn-danger" onclick="window.__adminConfirmDelete('${it.id}')">Confirm</button>
             </div>
           ` : `
+            <button class="btn btn-ghost" ${olderFormat(it) ? 'disabled title="Use Optimise older photos first"' : ''} onclick="window.__adminManagePhotos('${it.id}')">Manage photos</button>
             <button class="btn btn-ghost" ${it.email ? '' : 'disabled title="No email on file for this listing"'} onclick="window.__adminSendRecovery('${it.id}')">Send recovery link</button>
             <button class="btn btn-ghost" onclick="window.__adminToggleHidden('${it.id}', ${hidden})">${hidden ? 'Unhide' : 'Hide'}</button>
             <button class="btn btn-danger" onclick="window.__adminStartDelete('${it.id}')">Delete permanently</button>
@@ -636,6 +790,10 @@ onAuthStateChanged(auth, user => {
 window.doSignIn = doSignIn;
 window.doResetPassword = doResetPassword;
 window.optimiseOlderPhotos = optimiseOlderPhotos;
+window.__adminManagePhotos = openPhotoManager;
+window.closePhotoManager = closePhotoManager;
+window.__pmMakeMain = makeMainPhoto;
+window.__pmRemove = removePhoto;
 window.__adminSignOut = doSignOut;
 window.__adminToggleHidden = toggleHidden;
 window.__adminSendRecovery = sendRecovery;
