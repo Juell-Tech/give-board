@@ -168,6 +168,10 @@
       <h1 style="margin:0;font-size:1.4rem;">All listings</h1>
       <span class="who" id="countLabel"></span>
     </div>
+    <div id="optimiseBar" style="display:none;margin-bottom:14px;padding:12px 14px;border:1px solid var(--line, #d9cfbd);border-radius:10px;">
+      <div id="optimiseText" style="font-size:.9rem;margin-bottom:8px;"></div>
+      <button class="btn btn-ghost" id="optimiseBtn" onclick="optimiseOlderPhotos()">Optimise older photos</button>
+    </div>
     <div id="listWrap"></div>
   </div>
 </main>
@@ -179,7 +183,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import {
   getFirestore, collection, doc, getDoc, setDoc, getDocs, deleteDoc, updateDoc, orderBy, query, limit,
-  Timestamp, serverTimestamp
+  Timestamp, serverTimestamp, writeBatch, deleteField
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -394,6 +398,96 @@ async function loadAllListings(){
   }
 
   renderRows(rows);
+  updateOptimiseBar();
+}
+
+/* ---- one-off tidy-up of listings posted before thumbnails existed ---- */
+const OPT_MAX_DIM = 800;               // same limits the public site applies to new photos
+const OPT_TARGET_CHARS = 200 * 1024;
+const OPT_THUMB_DIM = 400;
+
+function olderListings(){
+  return Object.values(rowsById).filter(r => r.image && !r.thumb);
+}
+
+function updateOptimiseBar(message){
+  const old = olderListings();
+  const bar = document.getElementById('optimiseBar');
+  const text = document.getElementById('optimiseText');
+  bar.style.display = (old.length || message) ? 'block' : 'none';
+  document.getElementById('optimiseBtn').style.display = old.length ? 'inline-block' : 'none';
+  if(message){
+    text.textContent = message;
+  }else if(old.length){
+    const kb = Math.round(old.reduce((n, r) => n + r.image.length, 0) / 1024);
+    text.textContent = old.length + ' older listing' + (old.length === 1 ? '' : 's') +
+      ' still use a single full-size photo (' + kb + ' KB). Optimise gives each one a small thumbnail for the board and a resized photo, like new listings.';
+  }
+}
+
+function loadImg(src){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+function drawScaled(img, maxDim){
+  const canvas = document.createElement('canvas');
+  const scale = Math.min(1, maxDim / img.width, maxDim / img.height); // resize only, never crop
+  canvas.width = Math.round(img.width * scale);
+  canvas.height = Math.round(img.height * scale);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff'; // JPEG has no transparency
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+async function shrinkOlderPhoto(original){
+  const img = await loadImg(original);
+  const canvas = drawScaled(img, OPT_MAX_DIM);
+  let photo = '';
+  for(const quality of [0.72, 0.62, 0.52, 0.42, 0.32]){
+    photo = canvas.toDataURL('image/jpeg', quality);
+    if(photo.length <= OPT_TARGET_CHARS) break;
+  }
+  if(photo.length >= original.length) photo = original; // already smaller than we can make it
+  const thumb = drawScaled(img, OPT_THUMB_DIM).toDataURL('image/jpeg', 0.6);
+  return { photo, thumb };
+}
+
+async function optimiseOlderPhotos(){
+  const old = olderListings();
+  if(!old.length) return;
+  const btn = document.getElementById('optimiseBtn');
+  btn.disabled = true;
+  let done = 0, before = 0, after = 0, failed = 0;
+  for(const r of old){
+    btn.textContent = 'Optimising ' + (done + failed + 1) + ' of ' + old.length + '…';
+    try{
+      const { photo, thumb } = await shrinkOlderPhoto(r.image);
+      // One batch, so a listing never ends up without its photo
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'items', r.id, 'photos', 'p1'), { data: photo });
+      batch.update(doc(db, 'items', r.id), { thumb, mainPhoto: 'p1', photoCount: 1, image: deleteField() });
+      await batch.commit();
+      before += r.image.length;
+      after += photo.length + thumb.length;
+      done++;
+    }catch(e){
+      console.error('Failed to optimise listing ' + r.id, e);
+      failed++;
+    }
+  }
+  btn.disabled = false;
+  btn.textContent = 'Optimise older photos';
+  await loadAllListings();
+  updateOptimiseBar('Optimised ' + done + ' listing' + (done === 1 ? '' : 's') + ': ' +
+    Math.round(before / 1024) + ' KB before, ' + Math.round(after / 1024) + ' KB after (including thumbnails).' +
+    (failed ? ' ' + failed + ' could not be changed; try again.' : ''));
 }
 
 function renderRows(rows){
@@ -541,6 +635,7 @@ onAuthStateChanged(auth, user => {
 
 window.doSignIn = doSignIn;
 window.doResetPassword = doResetPassword;
+window.optimiseOlderPhotos = optimiseOlderPhotos;
 window.__adminSignOut = doSignOut;
 window.__adminToggleHidden = toggleHidden;
 window.__adminSendRecovery = sendRecovery;
