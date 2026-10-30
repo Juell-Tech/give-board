@@ -1172,8 +1172,8 @@ async function loadPhotoEditor(){
     const supportHref = document.getElementById('supportEmailLink').href;
     el.innerHTML = `<p class="editor-note">${lookupItem.ownerUid
       ? 'Photos can only be edited from the browser this listing was posted from.'
-      : "Photos on this listing can't be edited here."}
-      Need a change? <a href="${supportHref}" style="color:var(--forest);font-weight:600;">Email support</a>.</p>`;
+      : "This is an older listing, so its photos can't be edited. To add more photos, remove this listing with \"Cancel this listing\" below, then post it again with up to four photos."}
+      ${lookupItem.ownerUid ? `Need a change? <a href="${supportHref}" style="color:var(--forest);font-weight:600;">Email support</a>.` : ''}</p>`;
     return;
   }
 
