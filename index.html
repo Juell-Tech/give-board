@@ -1159,6 +1159,7 @@ function renderLookupResult(msgs, hidden){
 let editorBusy = false;
 let editAction = null; // { type: 'replace' | 'add', id? }
 let editorErr = '';
+let relistedNow = false; // true right after Re-List, so the editor can invite more photos
 
 async function loadPhotoEditor(){
   const el = document.getElementById('photoEditor');
@@ -1201,7 +1202,13 @@ async function loadPhotoEditor(){
       </div>`;
   }).join('');
 
+  const relistPrompt = relistedNow
+    ? `<p class="editor-note" style="color:var(--forest);font-weight:600;">Back on the board! ${photos.length < MAX_PHOTOS
+        ? 'Want to show it better? You can add up to ' + (MAX_PHOTOS - photos.length) + ' more photo' + (MAX_PHOTOS - photos.length === 1 ? '' : 's') + ' below.'
+        : 'It already has the maximum of ' + MAX_PHOTOS + ' photos.'}</p>`
+    : '';
   el.innerHTML = `
+    ${relistPrompt}
     <div class="editor-head">Your photos</div>
     ${rows}
     ${photos.length < MAX_PHOTOS ? `<button type="button" class="btn btn-ghost" style="width:100%;" onclick="editAddPhoto()">Add a photo</button>` : ''}
@@ -1322,6 +1329,7 @@ async function doLookup(){
     document.getElementById('supportEmailNote').style.display = 'none';
     const it = snap.docs[0];
     const itData = it.data();
+    relistedNow = false;
     lookupItem = {
       id: it.id, title: itData.title, gone: !!itData.gone,
       ownerUid: itData.ownerUid || null, mainPhoto: itData.mainPhoto || null,
@@ -1375,6 +1383,7 @@ async function relistLookupItem(){
   try{
     await updateDoc(doc(db, 'items', lookupItem.id), { gone: false });
     lookupItem.gone = false;
+    relistedNow = true;
     renderLookupResult(await fetchLookupMessages(), false);
   }catch(e){
     console.error('Failed to re-list item', e);
