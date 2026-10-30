@@ -6,26 +6,82 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.email == 'junior@juelltech.com';
     }
 
+    // Original listing shape: the one photo is stored on the listing itself
+    function legacyItemShape(){
+      return request.resource.data.keys().hasOnly(['title','condition','description','image','reference','postedAt'])
+          && request.resource.data.image is string
+          && request.resource.data.image.size() > 0
+          && request.resource.data.image.size() <= 750000;
+    }
+
+    // Current shape: small board thumbnail on the listing, full photos in the photos subcollection
+    function photoItemShape(){
+      return request.resource.data.keys().hasAll(['title','condition','description','thumb','reference','postedAt','mainPhoto','photoCount'])
+          && request.resource.data.keys().hasOnly(['title','condition','description','thumb','reference','postedAt','mainPhoto','photoCount','ownerUid'])
+          && request.resource.data.thumb is string
+          && request.resource.data.thumb.size() > 0
+          && request.resource.data.thumb.size() <= 150000
+          && request.resource.data.mainPhoto in ['p1','p2','p3','p4']
+          && request.resource.data.photoCount is int
+          && request.resource.data.photoCount >= 1
+          && request.resource.data.photoCount <= 4
+          && (!('ownerUid' in request.resource.data)
+              || (request.auth != null && request.resource.data.ownerUid == request.auth.uid));
+    }
+
+    function itemPath(itemId){
+      return /databases/$(database)/documents/items/$(itemId);
+    }
+
+    function isItemOwner(itemId){
+      return request.auth != null
+          && exists(itemPath(itemId))
+          && get(itemPath(itemId)).data.get('ownerUid', null) == request.auth.uid;
+    }
+
+    // True only while the listing itself is being created in the same batch as its first photos
+    function isNewItemInThisWrite(itemId){
+      return !exists(itemPath(itemId)) && existsAfter(itemPath(itemId));
+    }
+
     match /items/{itemId} {
       allow read: if true;
-      allow create: if request.resource.data.keys().hasOnly(['title','condition','description','image','reference','postedAt'])
-                    && request.resource.data.title is string
+      allow create: if request.resource.data.title is string
                     && request.resource.data.title.size() > 0
                     && request.resource.data.title.size() <= 200
                     && request.resource.data.condition in ['Like New','Good','Well-Loved']
                     && request.resource.data.description is string
                     && request.resource.data.description.size() <= 2000
-                    && request.resource.data.image is string
-                    && request.resource.data.image.size() > 0
-                    && request.resource.data.image.size() <= 750000
                     && request.resource.data.reference is string
-                    && request.resource.data.postedAt == request.time;
+                    && request.resource.data.postedAt == request.time
+                    && (legacyItemShape() || photoItemShape());
       allow update: if isAdmin()
                     || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hidden'])
                         && request.resource.data.hidden == true)
                     || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['gone'])
-                        && request.resource.data.gone is bool);
+                        && request.resource.data.gone is bool)
+                    || (request.auth != null
+                        && resource.data.get('ownerUid', null) == request.auth.uid
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['thumb','mainPhoto','photoCount'])
+                        && request.resource.data.mainPhoto in ['p1','p2','p3','p4']
+                        && request.resource.data.photoCount is int
+                        && request.resource.data.photoCount >= 1
+                        && request.resource.data.photoCount <= 4
+                        && request.resource.data.thumb is string
+                        && request.resource.data.thumb.size() <= 150000);
       allow delete: if isAdmin();
+
+      // Up to four full-size photos per listing, in fixed slots p1-p4 (so a listing can never hold more)
+      match /photos/{photoId} {
+        allow read: if true;
+        allow create, update: if photoId in ['p1','p2','p3','p4']
+                              && request.resource.data.keys().hasOnly(['data'])
+                              && request.resource.data.data is string
+                              && request.resource.data.data.size() > 0
+                              && request.resource.data.data.size() <= 750000
+                              && (isNewItemInThisWrite(itemId) || isItemOwner(itemId) || isAdmin());
+        allow delete: if isItemOwner(itemId) || isAdmin();
+      }
 
       match /messages/{messageId} {
         allow read: if true;

@@ -67,7 +67,7 @@
     padding:14px;align-items:flex-start;flex-wrap:wrap;
   }
   .row.is-hidden{opacity:0.6;}
-  .row img{width:84px;height:84px;object-fit:cover;border-radius:3px;border:1px solid var(--line);background:#eee;flex-shrink:0;}
+  .row img{width:84px;height:84px;object-fit:contain;background:var(--paper);border-radius:3px;border:1px solid var(--line);background:#eee;flex-shrink:0;}
   .row-body{flex:1;min-width:200px;}
   .row-body h3{margin:0 0 4px;font-size:1.02rem;}
   .row-body .meta{font-size:0.8rem;color:var(--muted);margin-bottom:6px;}
@@ -368,7 +368,7 @@ function renderRows(rows){
     const deleting = confirmingDeleteId === it.id;
     return `
       <div class="row ${hidden ? 'is-hidden' : ''}" data-id="${it.id}">
-        <img src="${it.image}" alt="${escapeHtml(it.title)}">
+        <img src="${it.thumb || it.image}" alt="${escapeHtml(it.title)}">
         <div class="row-body">
           <h3>${escapeHtml(it.title)}</h3>
           <div class="meta">
@@ -416,6 +416,8 @@ async function confirmDelete(itemId){
   try{
     const msgsSnap = await getDocs(collection(db, 'items', itemId, 'messages'));
     await Promise.all(msgsSnap.docs.map(m => deleteDoc(m.ref)));
+    const photosSnap = await getDocs(collection(db, 'items', itemId, 'photos'));
+    await Promise.all(photosSnap.docs.map(ph => deleteDoc(ph.ref)));
     await deleteDoc(doc(db, 'items', itemId));
     confirmingDeleteId = null;
     await loadAllListings();

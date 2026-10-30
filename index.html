@@ -100,7 +100,7 @@
     position:absolute;top:-7px;left:50%;transform:translateX(-50%);
     width:12px;height:12px;border-radius:50%;background:var(--clay);box-shadow:0 1px 2px rgba(0,0,0,.3);
   }
-  .card img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;border:1px solid var(--line);background:#eee;}
+  .card img{width:100%;aspect-ratio:1/1;object-fit:contain;display:block;border:1px solid var(--line);background:var(--paper);}
   .card h3{font-size:1.02rem;margin:10px 0 4px;font-weight:600;line-height:1.25;}
   .card .meta{font-size:0.8rem;color:var(--muted);}
   .card-photo{position:relative;}
@@ -135,7 +135,7 @@
   .modal{background:var(--paper);max-width:640px;width:100%;max-height:90vh;overflow-y:auto;border-radius:4px;position:relative;box-shadow:0 24px 60px rgba(0,0,0,.3);}
   .modal-close{position:absolute;top:14px;right:14px;background:var(--forest);color:var(--paper);border:none;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;line-height:1;z-index:5;}
 
-  .detail-img{width:100%;max-height:360px;object-fit:cover;display:block;background:#eee;}
+  .detail-img{width:100%;max-height:420px;object-fit:contain;display:block;background:var(--paper-warm);}
   .detail-img.is-gone{filter:grayscale(1) brightness(0.9);}
   .detail-body{padding:26px 28px 30px;}
   .detail-body h2{margin:0 0 6px;font-size:1.55rem;font-weight:600;}
@@ -165,11 +165,41 @@
     font-family:'Work Sans',sans-serif;font-size:0.95rem;background:#fff;color:var(--ink);
   }
   textarea{min-height:80px;resize:vertical;}
-  .drop{border:1.5px dashed var(--line);border-radius:4px;padding:22px 16px;text-align:center;color:var(--muted);font-size:0.9rem;background:#fff;}
-  .drop.has-img{padding:0;border-style:solid;}
-  .drop img{width:100%;max-height:220px;object-fit:cover;display:block;border-radius:3px;}
-  .photo-choice{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+  .photo-choice{display:flex;gap:10px;flex-wrap:wrap;}
   .photo-choice .btn{padding:9px 16px;font-size:0.85rem;}
+  .photo-hint{font-weight:400;color:var(--muted);font-size:0.78rem;}
+  .photo-tray{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px;margin-bottom:12px;}
+  .photo-tray:empty{display:none;}
+  .tray-item{position:relative;border:2px solid var(--line);border-radius:4px;overflow:hidden;background:#fff;}
+  .tray-item.is-main{border-color:var(--clay);}
+  .tray-item img{width:100%;aspect-ratio:1/1;object-fit:contain;display:block;background:var(--paper);}
+  .tray-main{
+    width:100%;border:none;background:var(--paper-warm);color:var(--forest);font-family:'Work Sans',sans-serif;
+    font-size:0.74rem;font-weight:600;padding:6px 4px;cursor:pointer;
+  }
+  .tray-item.is-main .tray-main{background:var(--clay);color:#fff;cursor:default;}
+  .tray-remove{
+    position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;border:none;
+    background:rgba(33,50,42,0.8);color:#fff;font-size:0.95rem;line-height:1;cursor:pointer;
+  }
+  .detail-thumbs{display:flex;gap:8px;padding:10px 28px 0;flex-wrap:wrap;}
+  .detail-thumbs button{
+    width:58px;height:58px;padding:0;border:2px solid var(--line);border-radius:4px;overflow:hidden;
+    background:#eee;cursor:pointer;
+  }
+  .detail-thumbs button.is-active{border-color:var(--clay);}
+  .detail-thumbs img{width:100%;height:100%;object-fit:contain;display:block;background:var(--paper);}
+  .load-more{text-align:center;margin-top:28px;}
+  .editor-note{font-size:0.78rem;color:var(--muted);text-align:center;margin-top:16px;line-height:1.5;}
+  .editor-head{font-family:'Fraunces',serif;font-weight:600;font-size:1rem;text-align:center;margin:20px 0 10px;color:var(--forest);}
+  .editor-row{
+    display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:4px;
+    background:var(--paper-warm);padding:8px;margin-bottom:8px;text-align:left;
+  }
+  .editor-row img{width:52px;height:52px;object-fit:contain;background:var(--paper);border-radius:3px;border:1px solid var(--line);flex-shrink:0;}
+  .editor-row .editor-label{flex:1;font-size:0.82rem;font-weight:600;}
+  .editor-row .editor-btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+  .editor-row .btn{padding:5px 9px;font-size:0.72rem;}
   .form-actions{margin-top:24px;}
   .err{color:var(--clay);font-size:0.85rem;margin-top:6px;display:none;}
   .field-note{font-size:0.78rem;color:var(--muted);margin-top:5px;}
@@ -242,6 +272,7 @@
   <div class="modal">
     <button class="modal-close" onclick="closeDetail()">&times;</button>
     <img id="detailImg" class="detail-img" src="" alt="">
+    <div class="detail-thumbs" id="detailThumbs" style="display:none;"></div>
     <div class="detail-body">
       <h2 id="detailTitle"></h2>
       <div class="meta-row" id="detailMeta"></div>
@@ -279,19 +310,14 @@
       <h2>Give an item</h2>
       <div class="sub">Add a photo and a few details. It'll appear on the board right away — no name or contact info is published.</div>
 
-      <label>Photo</label>
-      <div class="drop" id="dropZone">
-        <div id="dropPrompt">
-          <span style="display:block;margin-bottom:12px;">Add a photo of the item</span>
-          <div class="photo-choice">
-            <button type="button" class="btn btn-ghost" onclick="document.getElementById('cameraInput').click()">Take photo</button>
-            <button type="button" class="btn btn-ghost" onclick="document.getElementById('fileInput').click()">Choose from device</button>
-          </div>
-        </div>
+      <label>Photos <span class="photo-hint">— up to 4. Tap "Make main" to choose the one shown on the board.</span></label>
+      <div class="photo-tray" id="photoTray"></div>
+      <div class="photo-choice" id="photoChoice">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('cameraInput').click()">Take photo</button>
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('fileInput').click()">Choose from device</button>
       </div>
-      <input type="file" id="fileInput" accept="image/*" style="display:none">
+      <input type="file" id="fileInput" accept="image/*" multiple style="display:none">
       <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none">
-      <button type="button" class="btn-ghost" id="retakeBtn" style="display:none;border:1.5px solid var(--line);color:var(--muted);background:transparent;border-radius:3px;padding:8px 14px;font-size:0.82rem;margin-top:10px;cursor:pointer;" onclick="resetPhoto()">Remove photo, choose another</button>
       <div class="field-note" id="photoCheckStatus" style="display:none;">Checking photo…</div>
       <div class="err" id="imgErr">Please add a photo before posting.</div>
 
@@ -360,6 +386,7 @@
       </div>
       <div class="err" id="lookupErr" style="text-align:center;">No listing found with that reference.</div>
       <div class="lookup-list" id="lookupResults"></div>
+      <input type="file" id="editPhotoInput" accept="image/*" style="display:none">
       <p id="supportEmailNote" style="text-align:center;margin-top:16px;font-size:0.82rem;color:var(--muted);">
         Lost your reference code? <a id="supportEmailLink" href="#" style="color:var(--forest);font-weight:600;">Email support</a>
       </p>
@@ -386,9 +413,10 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
 import {
-  getFirestore, collection, doc, setDoc, addDoc, getDocs, getDoc, updateDoc, increment,
-  onSnapshot, query, orderBy, where, serverTimestamp
+  getFirestore, collection, doc, setDoc, addDoc, getDocs, getDoc, updateDoc, deleteDoc, increment,
+  onSnapshot, query, orderBy, where, limit, writeBatch, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { toDataURL as qrToDataURL } from "https://cdn.jsdelivr.net/npm/qrcode@1.5.4/+esm";
 
 const firebaseConfig = {
@@ -410,9 +438,40 @@ const supportBody = encodeURIComponent(
 );
 document.getElementById('supportEmailLink').href = `mailto:junior@juelltech.com?subject=${supportSubject}&body=${supportBody}`;
 
+const auth = getAuth(app);
+const MAX_PHOTOS = 4;
+const PHOTO_IDS = ['p1', 'p2', 'p3', 'p4'];
+const BOARD_PAGE_SIZE = 24;
+
 let items = [];
-let pendingImage = null;
+let pendingPhotos = []; // data URLs for the photos being added to a new listing
+let pendingMain = 0;    // index into pendingPhotos of the main photo
 let activeItem = null;
+let boardLimit = BOARD_PAGE_SIZE;
+let boardHasMore = false;
+let unsubscribeBoard = null;
+const photoCache = {};
+
+async function ensureOwnerUid(){
+  try{
+    await auth.authStateReady();
+    if(auth.currentUser) return auth.currentUser.uid;
+    const cred = await signInAnonymously(auth);
+    return cred.user.uid;
+  }catch(e){
+    console.warn('Anonymous sign-in unavailable — listing will have no editable owner', e);
+    return null;
+  }
+}
+
+async function currentUid(){
+  try{
+    await auth.authStateReady();
+    return auth.currentUser ? auth.currentUser.uid : null;
+  }catch(e){
+    return null;
+  }
+}
 
 function escapeHtml(s){
   return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -426,8 +485,10 @@ function genReference(){
 }
 
 function subscribeItems(){
-  const q = query(collection(db, 'items'), orderBy('postedAt', 'desc'));
-  onSnapshot(q, snapshot => {
+  if(unsubscribeBoard) unsubscribeBoard();
+  const q = query(collection(db, 'items'), orderBy('postedAt', 'desc'), limit(boardLimit));
+  unsubscribeBoard = onSnapshot(q, snapshot => {
+    boardHasMore = snapshot.size >= boardLimit;
     items = snapshot.docs
       .map(d => ({ id: d.id, ...d.data() }))
       .filter(it => !it.hidden);
@@ -435,6 +496,11 @@ function subscribeItems(){
   }, err => {
     console.error('Failed to load items', err);
   });
+}
+
+function loadMoreItems(){
+  boardLimit += BOARD_PAGE_SIZE;
+  subscribeItems();
 }
 
 function badgeClass(cond){
@@ -446,10 +512,11 @@ function badgeClass(cond){
 function render(){
   const wrap = document.getElementById('gridWrap');
   const count = document.getElementById('itemCount');
-  count.textContent = items.length === 1 ? '1 item' : items.length + ' items';
+  count.textContent = (items.length === 1 && !boardHasMore) ? '1 item' : items.length + (boardHasMore ? '+' : '') + ' items';
 
   if(items.length === 0){
-    wrap.innerHTML = `<div class="empty"><strong>The board is empty</strong>Be the first to give something away.</div>`;
+    wrap.innerHTML = `<div class="empty"><strong>The board is empty</strong>Be the first to give something away.</div>`
+      + (boardHasMore ? `<div class="load-more"><button class="btn btn-ghost" onclick="loadMoreItems()">Load more</button></div>` : '');
     return;
   }
 
@@ -461,14 +528,15 @@ function render(){
       <div class="card" style="--r:${rot}deg" onclick="openDetail('${it.id}')">
         <div class="pin"></div>
         <div class="card-photo">
-          <img src="${it.image}" alt="${escapeHtml(it.title)}" class="${gone ? 'is-gone' : ''}">
+          <img src="${it.thumb || it.image}" alt="${escapeHtml(it.title)}" class="${gone ? 'is-gone' : ''}">
           ${gone ? `<div class="gone-overlay"><div class="tick">✓</div><div class="label">Gone</div></div>` : ''}
         </div>
         <h3>${escapeHtml(it.title)}</h3>
         <div class="meta">Posted ${date}</div>
         <span class="badge ${badgeClass(it.condition)}">${escapeHtml(it.condition || 'Good')}</span>
       </div>`;
-  }).join('') + `</div>`;
+  }).join('') + `</div>`
+    + (boardHasMore ? `<div class="load-more"><button class="btn btn-ghost" onclick="loadMoreItems()">Load more</button></div>` : '');
 }
 
 /* ---- post modal ---- */
@@ -486,24 +554,39 @@ function closePostModal(){
   document.getElementById('imgErr').textContent = 'Please add a photo before posting.';
   document.getElementById('imgErr').style.display = 'none';
   document.getElementById('conditionErr').style.display = 'none';
-  resetPhoto();
+  resetPhotos();
 }
 
-function resetPhoto(){
-  pendingImage = null;
+function resetPhotos(){
+  pendingPhotos = [];
+  pendingMain = 0;
   document.getElementById('photoCheckStatus').style.display = 'none';
-  const dz = document.getElementById('dropZone');
-  dz.classList.remove('has-img');
-  dz.innerHTML = `<div id="dropPrompt">
-      <span style="display:block;margin-bottom:12px;">Add a photo of the item</span>
-      <div class="photo-choice">
-        <button type="button" class="btn btn-ghost" onclick="document.getElementById('cameraInput').click()">Take photo</button>
-        <button type="button" class="btn btn-ghost" onclick="document.getElementById('fileInput').click()">Choose from device</button>
-      </div>
-    </div>`;
-  document.getElementById('retakeBtn').style.display = 'none';
   document.getElementById('fileInput').value = '';
   document.getElementById('cameraInput').value = '';
+  renderPhotoTray();
+}
+
+function renderPhotoTray(){
+  const tray = document.getElementById('photoTray');
+  tray.innerHTML = pendingPhotos.map((src, i) => `
+    <div class="tray-item ${i === pendingMain ? 'is-main' : ''}">
+      <img src="${src}" alt="Photo ${i + 1}">
+      <button type="button" class="tray-remove" onclick="removePendingPhoto(${i})" aria-label="Remove photo ${i + 1}">&times;</button>
+      <button type="button" class="tray-main" onclick="setMainPendingPhoto(${i})">${i === pendingMain ? 'Main photo' : 'Make main'}</button>
+    </div>`).join('');
+  document.getElementById('photoChoice').style.display = pendingPhotos.length >= MAX_PHOTOS ? 'none' : 'flex';
+}
+
+function removePendingPhoto(i){
+  pendingPhotos.splice(i, 1);
+  if(pendingMain === i) pendingMain = 0;
+  else if(pendingMain > i) pendingMain--;
+  renderPhotoTray();
+}
+
+function setMainPendingPhoto(i){
+  pendingMain = i;
+  renderPhotoTray();
 }
 
 let nsfwModelPromise = null;
@@ -528,58 +611,99 @@ async function isInappropriatePhoto(canvas){
   }
 }
 
-function handlePhotoFile(file){
-  if(!file) return;
-  const img = new Image();
-  const reader = new FileReader();
-  reader.onload = function(ev){
-    img.onload = async function(){
-      const canvas = document.createElement('canvas');
-      const maxDim = 900; // bounding box applied to whichever side is larger, so vertical (portrait) photos are capped just like landscape ones
-      const scale = Math.min(1, maxDim / img.width, maxDim / img.height);
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+const MAX_DIM = 800; // bounding box on the larger side, so vertical photos are capped just like horizontal ones
+const TARGET_PHOTO_CHARS = 200 * 1024; // aim for roughly 150 KB per photo
+const THUMB_DIM = 400;
 
-      let dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-      if(dataUrl.length > MAX_IMAGE_CHARS){
-        dataUrl = canvas.toDataURL('image/jpeg', 0.35);
-      }
-      if(dataUrl.length > MAX_IMAGE_CHARS){
-        document.getElementById('imgErr').textContent = 'That photo is too large even after compression — please try a simpler photo or a tighter crop.';
-        document.getElementById('imgErr').style.display = 'block';
-        return;
-      }
+function loadImageFromSrc(src){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
 
-      document.getElementById('imgErr').style.display = 'none';
-      document.getElementById('photoCheckStatus').style.display = 'block';
-      const flagged = await isInappropriatePhoto(canvas);
-      document.getElementById('photoCheckStatus').style.display = 'none';
+function readFileAsDataUrl(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
-      if(flagged){
-        document.getElementById('imgErr').textContent = "This photo was flagged as inappropriate and can't be used. Please choose a different photo.";
-        document.getElementById('imgErr').style.display = 'block';
-        return;
-      }
+// Resizes, compresses and content-checks one photo. Resolves to { dataUrl } or { error }.
+async function processPhotoFile(file, statusId){
+  let img;
+  try{
+    img = await loadImageFromSrc(await readFileAsDataUrl(file));
+  }catch(e){
+    return { error: "We couldn't read that file as a photo." };
+  }
+  const canvas = document.createElement('canvas');
+  const scale = Math.min(1, MAX_DIM / img.width, MAX_DIM / img.height);
+  canvas.width = Math.round(img.width * scale);
+  canvas.height = Math.round(img.height * scale);
+  canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      pendingImage = dataUrl;
-      const dz = document.getElementById('dropZone');
-      dz.classList.add('has-img');
-      dz.innerHTML = `<img src="${pendingImage}">`;
-      document.getElementById('retakeBtn').style.display = 'inline-block';
-      document.getElementById('imgErr').style.display = 'none';
-    };
-    img.src = ev.target.result;
-  };
-  reader.readAsDataURL(file);
+  let dataUrl = '';
+  for(const quality of [0.72, 0.62, 0.52, 0.42, 0.32]){
+    dataUrl = canvas.toDataURL('image/jpeg', quality);
+    if(dataUrl.length <= TARGET_PHOTO_CHARS) break;
+  }
+  if(dataUrl.length > MAX_IMAGE_CHARS){
+    return { error: 'That photo is too large even after compression — please try a simpler photo or a tighter crop.' };
+  }
+
+  const status = document.getElementById(statusId);
+  status.style.display = 'block';
+  const flagged = await isInappropriatePhoto(canvas);
+  status.style.display = 'none';
+  if(flagged){
+    return { error: "This photo was flagged as inappropriate and can't be used. Please choose a different photo." };
+  }
+  return { dataUrl };
+}
+
+async function makeThumb(dataUrl){
+  const img = await loadImageFromSrc(dataUrl);
+  const canvas = document.createElement('canvas');
+  const scale = Math.min(1, THUMB_DIM / img.width, THUMB_DIM / img.height);
+  canvas.width = Math.round(img.width * scale);
+  canvas.height = Math.round(img.height * scale);
+  canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', 0.6);
+}
+
+async function addPendingPhotos(fileList){
+  const errEl = document.getElementById('imgErr');
+  errEl.style.display = 'none';
+  const files = Array.from(fileList || []);
+  for(const file of files){
+    if(pendingPhotos.length >= MAX_PHOTOS){
+      errEl.textContent = 'You can add up to 4 photos — the rest were skipped.';
+      errEl.style.display = 'block';
+      break;
+    }
+    const result = await processPhotoFile(file, 'photoCheckStatus');
+    if(result.error){
+      errEl.textContent = result.error;
+      errEl.style.display = 'block';
+      continue;
+    }
+    pendingPhotos.push(result.dataUrl);
+    renderPhotoTray();
+  }
+  document.getElementById('fileInput').value = '';
+  document.getElementById('cameraInput').value = '';
 }
 
 document.getElementById('fileInput').addEventListener('change', function(e){
-  handlePhotoFile(e.target.files[0]);
+  addPendingPhotos(e.target.files);
 });
 document.getElementById('cameraInput').addEventListener('change', function(e){
-  handlePhotoFile(e.target.files[0]);
+  addPendingPhotos(e.target.files);
 });
 
 async function submitItem(){
@@ -589,11 +713,13 @@ async function submitItem(){
   const email = document.getElementById('ownerEmail').value.trim();
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  document.getElementById('imgErr').style.display = pendingImage ? 'none' : 'block';
+  const imgErr = document.getElementById('imgErr');
+  imgErr.textContent = 'Please add a photo before posting.';
+  imgErr.style.display = pendingPhotos.length ? 'none' : 'block';
   document.getElementById('conditionErr').style.display = condition ? 'none' : 'block';
   document.getElementById('formErr').style.display = (title && desc && emailOk) ? 'none' : 'block';
 
-  if(!pendingImage || !title || !condition || !desc || !emailOk) return;
+  if(!pendingPhotos.length || !title || !condition || !desc || !emailOk) return;
 
   const submitBtn = document.getElementById('submitBtn');
   submitBtn.disabled = true;
@@ -604,10 +730,21 @@ async function submitItem(){
     // NOTE: email is intentionally NOT sent to Firestore — it never touches
     // shared storage, so it can never be displayed to other visitors.
     const itemRef = doc(collection(db, 'items'));
-    await setDoc(itemRef, {
+    const ownerUid = await ensureOwnerUid();
+    const thumb = await makeThumb(pendingPhotos[pendingMain]);
+    const itemData = {
       title, condition, description: desc,
-      image: pendingImage, reference, postedAt: serverTimestamp()
+      thumb, reference, postedAt: serverTimestamp(),
+      mainPhoto: PHOTO_IDS[pendingMain], photoCount: pendingPhotos.length
+    };
+    if(ownerUid) itemData.ownerUid = ownerUid;
+
+    const batch = writeBatch(db);
+    batch.set(itemRef, itemData);
+    pendingPhotos.forEach((data, i) => {
+      batch.set(doc(db, 'items', itemRef.id, 'photos', PHOTO_IDS[i]), { data });
     });
+    await batch.commit();
 
     try{
       await setDoc(doc(db, 'stats', 'totals'), { itemsPosted: increment(1) }, { merge: true });
@@ -666,11 +803,53 @@ async function markAsGone(itemId){
 }
 
 /* ---- detail modal ---- */
+// All photos for a listing, main photo first. Older listings keep their single photo on the item itself.
+async function loadItemPhotos(it){
+  if(photoCache[it.id]) return photoCache[it.id];
+  const list = [];
+  if(it.image) list.push({ id: 'legacy', data: it.image });
+  try{
+    const snap = await getDocs(collection(db, 'items', it.id, 'photos'));
+    snap.docs.forEach(d => list.push({ id: d.id, data: d.data().data }));
+  }catch(e){
+    console.error('Failed to load photos', e);
+  }
+  const mainId = it.mainPhoto || (it.image ? 'legacy' : 'p1');
+  const mainIdx = list.findIndex(p => p.id === mainId);
+  if(mainIdx > 0){
+    const [m] = list.splice(mainIdx, 1);
+    list.unshift(m);
+  }
+  if(list.length) photoCache[it.id] = list;
+  return list;
+}
+
+function showDetailPhoto(list, idx){
+  document.getElementById('detailImg').src = list[idx].data;
+  document.querySelectorAll('#detailThumbs button').forEach((b, i) => b.classList.toggle('is-active', i === idx));
+}
+
+async function renderDetailGallery(it){
+  const thumbsEl = document.getElementById('detailThumbs');
+  thumbsEl.style.display = 'none';
+  thumbsEl.innerHTML = '';
+  const list = await loadItemPhotos(it);
+  if(!activeItem || activeItem.id !== it.id || !list.length) return;
+  document.getElementById('detailImg').src = list[0].data;
+  if(list.length < 2) return;
+  thumbsEl.innerHTML = list.map((p, i) =>
+    `<button type="button" class="${i === 0 ? 'is-active' : ''}" aria-label="Photo ${i + 1}"><img src="${p.data}" alt=""></button>`
+  ).join('');
+  thumbsEl.querySelectorAll('button').forEach((b, i) => b.addEventListener('click', () => showDetailPhoto(list, i)));
+  thumbsEl.style.display = 'flex';
+}
+
 function openDetail(id){
   const it = items.find(x => x.id === id);
   if(!it) return;
   activeItem = it;
-  document.getElementById('detailImg').src = it.image;
+  document.getElementById('detailImg').src = it.thumb || it.image;
+  renderDetailGallery(it);
   document.getElementById('detailTitle').textContent = it.title;
   document.getElementById('detailMeta').textContent =
     'Posted ' + (it.postedAt ? it.postedAt.toDate().toLocaleDateString(undefined,{month:'short', day:'numeric', year:'numeric'}) : 'just now');
@@ -889,8 +1068,149 @@ function renderLookupResult(msgs, hidden){
       </div>`;
   }
 
-  results.innerHTML = `<p style="text-align:center;margin-bottom:14px;">Messages for "${escapeHtml(title)}"</p>` + msgsHtml + actionHtml;
+  const showEditor = !hidden && !lookupConfirmingCancel;
+  results.innerHTML = `<p style="text-align:center;margin-bottom:14px;">Messages for "${escapeHtml(title)}"</p>` + msgsHtml
+    + (showEditor ? `<div id="photoEditor"></div>` : '') + actionHtml;
+  if(showEditor) loadPhotoEditor();
 }
+
+/* ---- owner photo editor (inside Check your listing) ---- */
+let editorBusy = false;
+let editAction = null; // { type: 'replace' | 'add', id? }
+let editorErr = '';
+
+async function loadPhotoEditor(){
+  const el = document.getElementById('photoEditor');
+  if(!el || !lookupItem) return;
+  const itemId = lookupItem.id;
+  const uid = await currentUid();
+  const isOwner = !!(lookupItem.ownerUid && uid && lookupItem.ownerUid === uid);
+
+  if(!isOwner){
+    const supportHref = document.getElementById('supportEmailLink').href;
+    el.innerHTML = `<p class="editor-note">${lookupItem.ownerUid
+      ? 'Photos can only be edited from the browser this listing was posted from.'
+      : "Photos on this listing can't be edited here."}
+      Need a change? <a href="${supportHref}" style="color:var(--forest);font-weight:600;">Email support</a>.</p>`;
+    return;
+  }
+
+  el.innerHTML = `<p class="editor-note">Loading photos…</p>`;
+  let photos = [];
+  try{
+    const snap = await getDocs(collection(db, 'items', itemId, 'photos'));
+    photos = snap.docs.map(d => ({ id: d.id, data: d.data().data })).sort((a, b) => a.id.localeCompare(b.id));
+  }catch(e){
+    console.error('Failed to load photos for editing', e);
+  }
+  if(!lookupItem || lookupItem.id !== itemId || !document.getElementById('photoEditor')) return;
+  lookupItem.photoList = photos;
+
+  const rows = photos.map((p, i) => {
+    const isMain = p.id === lookupItem.mainPhoto;
+    return `
+      <div class="editor-row">
+        <img src="${p.data}" alt="Photo ${i + 1}">
+        <div class="editor-label">${isMain ? 'Main photo' : 'Photo ' + (i + 1)}</div>
+        <div class="editor-btns">
+          ${isMain ? '' : `<button type="button" class="btn btn-ghost" onclick="editMakeMain('${p.id}')">Make main</button>`}
+          <button type="button" class="btn btn-ghost" onclick="editReplace('${p.id}')">Replace</button>
+          ${photos.length > 1 ? `<button type="button" class="btn btn-ghost" style="border-color:var(--clay);color:var(--clay);" onclick="editRemove('${p.id}')">Remove</button>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="editor-head">Your photos</div>
+    ${rows}
+    ${photos.length < MAX_PHOTOS ? `<button type="button" class="btn btn-ghost" style="width:100%;" onclick="editAddPhoto()">Add a photo</button>` : ''}
+    <div class="field-note" id="editCheckStatus" style="display:none;text-align:center;">Checking photo…</div>
+    <div class="err" id="photoEditorErr" style="text-align:center;${editorErr ? 'display:block;' : ''}">${escapeHtml(editorErr)}</div>`;
+  editorErr = '';
+}
+
+async function runPhotoEdit(fn){
+  if(editorBusy) return;
+  editorBusy = true;
+  try{
+    await fn();
+    delete photoCache[lookupItem.id];
+  }catch(e){
+    console.error('Photo edit failed', e);
+    editorErr = 'Something went wrong saving that change. Please try again.';
+  }finally{
+    editorBusy = false;
+    await loadPhotoEditor();
+  }
+}
+
+function pickEditPhoto(action){
+  if(editorBusy) return;
+  editAction = action;
+  document.getElementById('editPhotoInput').click();
+}
+function editReplace(id){ pickEditPhoto({ type: 'replace', id }); }
+function editAddPhoto(){ pickEditPhoto({ type: 'add' }); }
+
+function editMakeMain(id){
+  runPhotoEdit(async () => {
+    const photo = lookupItem.photoList.find(p => p.id === id);
+    const thumb = await makeThumb(photo.data);
+    await updateDoc(doc(db, 'items', lookupItem.id), { mainPhoto: id, thumb });
+    lookupItem.mainPhoto = id;
+  });
+}
+
+function editRemove(id){
+  runPhotoEdit(async () => {
+    const remaining = lookupItem.photoList.filter(p => p.id !== id);
+    if(!remaining.length) throw new Error('A listing needs at least one photo');
+    const updates = { photoCount: remaining.length };
+    if(id === lookupItem.mainPhoto){
+      updates.mainPhoto = remaining[0].id;
+      updates.thumb = await makeThumb(remaining[0].data);
+    }
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'items', lookupItem.id, 'photos', id));
+    batch.update(doc(db, 'items', lookupItem.id), updates);
+    await batch.commit();
+    lookupItem.photoCount = remaining.length;
+    if(updates.mainPhoto) lookupItem.mainPhoto = updates.mainPhoto;
+  });
+}
+
+document.getElementById('editPhotoInput').addEventListener('change', async function(e){
+  const file = e.target.files[0];
+  e.target.value = '';
+  const action = editAction;
+  editAction = null;
+  if(!file || !action || !lookupItem) return;
+
+  const errEl = document.getElementById('photoEditorErr');
+  if(errEl) errEl.style.display = 'none';
+  const result = await processPhotoFile(file, 'editCheckStatus');
+  if(result.error){
+    editorErr = result.error;
+    await loadPhotoEditor();
+    return;
+  }
+
+  runPhotoEdit(async () => {
+    const itemRef = doc(db, 'items', lookupItem.id);
+    const batch = writeBatch(db);
+    if(action.type === 'replace'){
+      batch.set(doc(db, 'items', lookupItem.id, 'photos', action.id), { data: result.dataUrl });
+      if(action.id === lookupItem.mainPhoto) batch.update(itemRef, { thumb: await makeThumb(result.dataUrl) });
+    }else{
+      const freeId = PHOTO_IDS.find(pid => !lookupItem.photoList.some(p => p.id === pid));
+      if(!freeId) throw new Error('No free photo slot');
+      batch.set(doc(db, 'items', lookupItem.id, 'photos', freeId), { data: result.dataUrl });
+      batch.update(itemRef, { photoCount: lookupItem.photoList.length + 1 });
+      lookupItem.photoCount = lookupItem.photoList.length + 1;
+    }
+    await batch.commit();
+  });
+});
 
 async function fetchLookupMessages(){
   const msgsSnap = await getDocs(query(collection(db, 'items', lookupItem.id, 'messages'), orderBy('sentAt', 'desc')));
@@ -920,7 +1240,12 @@ async function doLookup(){
     err.style.display = 'none';
     document.getElementById('supportEmailNote').style.display = 'none';
     const it = snap.docs[0];
-    lookupItem = { id: it.id, title: it.data().title, gone: !!it.data().gone };
+    const itData = it.data();
+    lookupItem = {
+      id: it.id, title: itData.title, gone: !!itData.gone,
+      ownerUid: itData.ownerUid || null, mainPhoto: itData.mainPhoto || null,
+      photoCount: itData.photoCount || 0, photoList: []
+    };
     const hidden = !!it.data().hidden;
 
     const msgs = hidden ? [] : await fetchLookupMessages();
@@ -981,7 +1306,13 @@ document.querySelectorAll('.overlay').forEach(ov => {
 
 window.openPostModal = openPostModal;
 window.closePostModal = closePostModal;
-window.resetPhoto = resetPhoto;
+window.loadMoreItems = loadMoreItems;
+window.removePendingPhoto = removePendingPhoto;
+window.setMainPendingPhoto = setMainPendingPhoto;
+window.editMakeMain = editMakeMain;
+window.editReplace = editReplace;
+window.editAddPhoto = editAddPhoto;
+window.editRemove = editRemove;
 window.submitItem = submitItem;
 window.startCancelListing = startCancelListing;
 window.cancelCancelListing = cancelCancelListing;
